@@ -1,0 +1,1460 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Frome Orienteering</title>
+<meta name="theme-color" content="#332F53">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Frome O">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
+<script>
+/* ================= SETTINGS =================
+   Paste your Google Apps Script web app link between the quotes
+   (it ends in /exec). Leave it empty to turn auto-upload off;
+   scanning finish codes still works either way. */
+const CONFIG = {
+  sheetUrl: ""
+};
+</script>
+<style>
+/* Club identity: cream paper, navy ink, orange needle, sage contours. Navy header band carries the logo. */
+:root{
+  --paper:#FBF6EB; --surface:#FFFFFF; --ink:#2B2747; --muted:#69657F; --line:#E4DED0;
+  --band:#332F53; --band-ink:#FBF6EB;
+  --purple:#332F53; --purple-soft:#E9E6F2; --orange:#D95D1C; --orange-ink:#FFFFFF;
+  --green:#3D7548; --green-soft:#E4EBD6; --contour:#A9CDA9; --danger:#B3261E;
+  --head:"Fredoka","Nunito",system-ui,sans-serif;
+  --body:"Nunito",system-ui,-apple-system,"Segoe UI",sans-serif;
+  color-scheme:light; box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --paper:#1B1930; --surface:#252240; --ink:#F3EEE2; --muted:#A9A5BF; --line:#3A3658;
+    --band:#24213F; --band-ink:#FBF6EB;
+    --purple:#C9C3F0; --purple-soft:#34305A; --orange:#F07A3A; --orange-ink:#1B1930;
+    --green:#9FD3A3; --green-soft:#23362A; --contour:#3E5A47; --danger:#F08A80; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#1B1930; --surface:#252240; --ink:#F3EEE2; --muted:#A9A5BF; --line:#3A3658;
+  --band:#24213F; --band-ink:#FBF6EB;
+  --purple:#C9C3F0; --purple-soft:#34305A; --orange:#F07A3A; --orange-ink:#1B1930;
+  --green:#9FD3A3; --green-soft:#23362A; --contour:#3E5A47; --danger:#F08A80; color-scheme:dark;
+}
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--paper);color:var(--ink);font:400 17px/1.5 var(--body);-webkit-text-size-adjust:100%}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--band)}
+button,input,select{font:inherit;color:inherit}
+h1,h2,h3{font-family:var(--head);font-weight:600;line-height:1.1;margin:0}
+h1{font-size:2rem} h2{font-size:1.45rem} h3{font-size:1.15rem}
+p{margin:.4em 0}
+.wrap{max-width:720px;margin:0 auto;padding:16px 16px 48px}
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--band);color:var(--band-ink)}
+.top .in{max-width:720px;margin:0 auto;padding:10px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:10px;font-family:var(--head);font-weight:600;font-size:1.25rem;letter-spacing:.01em;margin-right:auto}
+.logo{width:44px;height:44px;border-radius:50%;background:#FBF6EB;flex:none;display:block}
+.flag{width:26px;height:26px;flex:none;border:1.5px solid var(--ink);background:linear-gradient(135deg,#fff 0 50%,#EC6C27 50% 100%)}
+nav{display:flex;gap:4px}
+nav a{font-family:var(--head);font-weight:500;text-decoration:none;color:var(--band-ink);opacity:.75;padding:6px 10px;border-radius:6px}
+nav a[aria-current="page"]{opacity:1;box-shadow:inset 0 -3px 0 #EC6C27}
+.btn{appearance:none;border:1.5px solid var(--ink);background:var(--surface);border-radius:12px;padding:10px 16px;font-family:var(--head);font-weight:600;font-size:1.05rem;cursor:pointer;min-height:44px}
+.btn.go{background:var(--orange);border-color:var(--orange);color:var(--orange-ink)}
+.btn.big{width:100%;padding:18px;font-size:1.4rem;border-radius:16px}
+.btn.quiet{border-color:var(--line)}
+.btn.danger{border-color:var(--danger);color:var(--danger)}
+.btn:disabled{opacity:.5;cursor:default}
+.link{background:none;border:0;padding:6px 0;color:var(--purple);font-weight:600;cursor:pointer;text-decoration:underline;text-underline-offset:3px}
+:focus-visible{outline:3px solid var(--purple);outline-offset:2px}
+label.f{display:block;margin:10px 0}
+label.f span{display:block;font-size:.9rem;color:var(--muted);margin-bottom:4px}
+input[type=text],input[type=number],input[type=date],input[type=time],select{width:100%;padding:10px 12px;border:1.5px solid var(--line);border-radius:8px;background:var(--surface);min-height:44px}
+input:focus{border-color:var(--purple);outline:none}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.row>*{flex:1 1 auto}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:0 12px}
+.muted{color:var(--muted)} .small{font-size:.9rem}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px;margin:14px 0}
+.sec{margin-top:28px} .sec>h2{margin-bottom:8px}
+.ok{color:var(--green);font-weight:600}
+.clockbox{text-align:center;padding:26px 8px 16px;margin:10px 0;border-radius:20px;background-color:var(--green-soft);background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='120' viewBox='0 0 240 120'%3E%3Cg fill='none' stroke='%23A9CDA9' stroke-width='2.2' stroke-linecap='round' opacity='.55'%3E%3Cpath d='M0 20c30-14 50 14 80 0s50-16 80 0 50 14 80 0'/%3E%3Cpath d='M0 50c30-14 50 14 80 0s50-16 80 0 50 14 80 0'/%3E%3Cpath d='M0 80c30-14 50 14 80 0s50-16 80 0 50 14 80 0'/%3E%3Cpath d='M0 110c30-14 50 14 80 0s50-16 80 0 50 14 80 0'/%3E%3C/g%3E%3C/svg%3E");background-size:240px 120px}
+.clock{font-family:var(--head);font-weight:600;color:var(--ink);font-size:clamp(4rem,22vw,7rem);line-height:1;font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+.remain{font-family:var(--head);font-weight:600;font-size:1.25rem;margin-top:6px}
+.remain.warn{color:var(--orange)} .remain.over{color:var(--danger)}
+.who{display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+.punches{list-style:none;margin:0;padding:0}
+.punches li{display:flex;align-items:center;gap:14px;padding:10px 0;border-bottom:1px solid var(--line)}
+.ring{width:42px;height:42px;flex:none;border:3px solid var(--purple);border-radius:50%;display:grid;place-items:center;font-family:var(--head);font-weight:700;color:var(--purple)}
+.punches .t{margin-left:auto;font-variant-numeric:tabular-nums;font-family:var(--head);font-weight:600}
+.qrbox{background:#fff;padding:14px;border-radius:10px;width:min(300px,100%);margin:14px auto;border:1px solid var(--line)}
+.qrbox svg{display:block;width:100%;height:auto}
+.status{text-align:center;padding:10px 12px;border-radius:8px;background:var(--surface);border:1px solid var(--line)}
+.status.sent{background:var(--green-soft);border-color:transparent;color:var(--green);font-weight:600}
+.ev{display:flex;gap:12px;align-items:center;padding:14px 0;border-bottom:1px solid var(--line)}
+.ev .meta{flex:1;min-width:0} .ev .acts{display:flex;gap:8px}
+.map{position:relative;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:#fff;touch-action:manipulation}
+.map img{display:block;width:100%;height:auto;user-select:none;-webkit-user-drag:none}
+.map.placing{cursor:crosshair;outline:3px solid var(--orange);outline-offset:-3px}
+.pin{position:absolute;width:30px;height:30px;margin:-15px 0 0 -15px;border:3px solid #A1197F;border-radius:50%;pointer-events:none}
+.pin b{position:absolute;left:24px;top:-14px;font:700 15px/1 var(--head);color:#A1197F;text-shadow:0 0 3px #fff,0 0 3px #fff}
+.ctl{display:grid;grid-template-columns:72px 84px 1fr auto;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line)}
+.ctl .code{font-family:var(--head);font-weight:600;letter-spacing:.04em}
+.ctl.hdr{font-size:.85rem;color:var(--muted);padding-bottom:2px}
+.res{list-style:none;padding:0;margin:0}
+.res>li{border-bottom:1px solid var(--line)}
+.res .line{display:grid;grid-template-columns:36px 1fr auto;gap:10px;align-items:center;padding:12px 0;width:100%;background:none;border:0;text-align:left;cursor:pointer}
+.res .pos{font-family:var(--head);font-weight:700;font-size:1.3rem;color:var(--muted)}
+.res .name{font-weight:600}
+.res .tot{font-family:var(--head);font-weight:700;font-size:1.5rem;font-variant-numeric:tabular-nums}
+.res .detail{padding:0 0 14px 46px}
+.tag{display:inline-block;font-size:.8rem;font-weight:600;padding:1px 8px;border-radius:99px;background:var(--green-soft);color:var(--green)}
+.tag.p{background:var(--purple-soft);color:var(--purple)}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0}
+.chip{min-width:52px;min-height:44px;border:2px solid var(--line);background:var(--surface);border-radius:50px;font-family:var(--head);font-weight:700;font-size:1.05rem;cursor:pointer}
+.chip[aria-pressed="true"]{border-color:var(--purple);background:var(--purple-soft);color:var(--purple)}
+.splits{font-size:.95rem;margin:6px 0;padding-left:18px}
+.bad{color:var(--danger)}
+.sheet{position:fixed;inset:0;z-index:20;background:rgba(10,14,12,.94);color:#fff;display:flex;flex-direction:column;padding:calc(env(safe-area-inset-top,0px) + 12px) 16px calc(env(safe-area-inset-bottom,0px) + 16px)}
+.sheet[hidden]{display:none}
+.sheet .bar{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.sheet .view{position:relative;flex:1;min-height:0;margin:12px 0;border-radius:12px;overflow:hidden;background:#000}
+.sheet video{width:100%;height:100%;object-fit:cover}
+.sheet .aim{position:absolute;inset:18% 14%;border:3px solid var(--orange);border-radius:16px;pointer-events:none}
+.sheet .btn{border-color:#fff;background:transparent;color:#fff}
+.sheet input{background:#fff;color:#1C2420;border-color:#fff}
+.form{position:fixed;inset:0;z-index:20;background:var(--paper);overflow:auto;padding-top:env(safe-area-inset-top,0px)}
+.form[hidden]{display:none}
+.toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 20px);transform:translateX(-50%);z-index:30;background:var(--ink);color:var(--paper);padding:12px 18px;border-radius:10px;font-weight:600;max-width:90vw;opacity:0;transition:opacity .2s;pointer-events:none}
+.toast.on{opacity:1} .toast.good{background:var(--green);color:var(--paper)} .toast.badt{background:var(--danger);color:var(--paper)}
+.seg{display:flex;border:1.5px solid var(--line);border-radius:10px;overflow:hidden}
+.seg button{flex:1;min-height:48px;border:0;background:var(--surface);font-family:var(--head);font-weight:600;font-size:1.1rem;cursor:pointer}
+.seg button+button{border-left:1.5px solid var(--line)}
+.seg button[aria-pressed="true"]{background:var(--purple);color:var(--paper)}
+.banner{padding:12px 14px;border-radius:10px;font-family:var(--head);font-weight:700;font-size:1.25rem;text-align:center;margin:10px 0}
+.banner[hidden]{display:none}
+.banner.warn{background:var(--orange);color:var(--orange-ink)} .banner.over{background:var(--danger);color:var(--paper)}
+.out{background:var(--surface);border:2px solid var(--orange);border-radius:10px;padding:12px 14px;margin:16px 0}
+.out ul{list-style:none;margin:6px 0 0;padding:0}
+.out li{display:flex;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.out li:last-child{border-bottom:0}
+.out .nm{font-weight:600;flex:1 1 160px}
+.course{display:grid;grid-template-columns:1fr 120px auto;gap:8px;align-items:center;padding:4px 0}
+label.f[hidden]{display:none}
+.pub{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin:14px 0;padding:12px 14px;border-radius:12px;background:var(--surface);border:1.5px solid var(--line)}
+.pub>div:first-child{flex:1 1 220px;min-width:0}
+.board{list-style:none;padding:0;margin:8px 0 0}
+.board li{display:grid;grid-template-columns:36px 1fr auto;gap:10px;align-items:center;padding:12px 0;border-bottom:1px solid var(--line)}
+.board .pos{font-family:var(--head);font-weight:600;font-size:1.3rem;color:var(--muted);font-variant-numeric:tabular-nums}
+.medal{display:block;width:30px;height:38px}.medal svg{display:block}
+.board .who{min-width:0;display:block}.board .who .small{display:block}
+.board .name{font-weight:700}
+.board .tot{font-family:var(--head);font-weight:600;font-size:1.5rem;font-variant-numeric:tabular-nums;text-align:right;line-height:1.15}
+.board .season{display:block;font-family:var(--body);font-weight:600;font-size:.8rem;color:var(--muted);white-space:nowrap}
+a.link{display:inline-block}
+nav{flex-wrap:wrap}
+textarea{width:100%;padding:10px 12px;border:1.5px solid var(--line);border-radius:8px;background:var(--surface);font:inherit;color:inherit;resize:vertical}
+textarea:focus{border-color:var(--purple);outline:none}
+details.mem{margin-top:16px} details.mem summary{cursor:pointer;font-weight:700;padding:6px 0}
+.memrow{display:flex;gap:8px;align-items:center;padding:4px 0}.memrow input{flex:1;min-width:0}
+.thanks{margin:16px 0 4px;padding:12px 14px;border-radius:12px;background:var(--green-soft)}
+.podium{margin:14px 0;padding:14px 16px;border-radius:16px;background:var(--green-soft)}
+.podium h2{font-size:1.2rem;margin-bottom:6px}
+.podium ol{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.podium li{display:flex;align-items:center;gap:10px}.podium .name{font-weight:700;flex:1;min-width:0}
+@media (prefers-reduced-motion:reduce){.toast{transition:none}}
+@media (max-width:460px){.ctl{grid-template-columns:60px 70px 1fr auto}.grid2{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header class="top"><div class="in">
+  <div class="brand"><img class="logo" src="data:image/png;base64,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" alt="">Frome Orienteering</div>
+  <nav id="nav"><a href="#events" data-org>Events</a><a href="#results" data-org>Results</a><a href="#run">Run</a><a href="#results-live" id="liveLink">Club results</a></nav>
+</div></header>
+<main class="wrap" id="app"></main>
+
+<div class="sheet" id="scanner" hidden role="dialog" aria-modal="true" aria-labelledby="scanTitle">
+  <div class="bar"><h2 id="scanTitle">Scan</h2><button class="btn" id="scanClose">Close</button></div>
+  <div class="view"><video id="video" playsinline muted></video><div class="aim"></div></div>
+  <p id="scanMsg" class="small">Starting camera…</p>
+  <div class="row" id="manualRow">
+    <input type="text" id="manualIn" autocomplete="off" autocapitalize="characters">
+    <button class="btn" id="manualGo" style="flex:0 0 auto">Use code</button>
+  </div>
+</div>
+<div class="form" id="form" hidden></div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<canvas id="cv" hidden></canvas>
+<datalist id="memberNames"></datalist>
+
+<script>
+"use strict";
+const LOGO = "data:image/png;base64,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";
+const $ = (s, r = document) => r.querySelector(s);
+function el(tag, props, ...kids) {
+  const n = document.createElement(tag);
+  if (props) for (const [k, v] of Object.entries(props)) {
+    if (v == null || v === false) continue;
+    if (k === "class") n.className = v;
+    else if (k === "html") n.innerHTML = v;
+    else if (k.startsWith("on") && typeof v === "function") n.addEventListener(k.slice(2), v);
+    else if (k in n && typeof v !== "string") n[k] = v;
+    else n.setAttribute(k, v === true ? "" : v);
+  }
+  for (const k of kids.flat(Infinity)) { if (k == null || k === false) continue; n.append(k instanceof Node ? k : String(k)); }
+  return n;
+}
+const app = $("#app");
+const SHEET = (CONFIG.sheetUrl || "").trim();
+const S = { editor: false, events: [], eventsLoaded: false, editing: null, newOpen: false,
+  resultsId: null, entries: [], allEntries: [], entriesFor: null, entriesLoaded: false, open: null,
+  placing: false, pending: false, mapUrls: {}, lastSync: 0, syncErr: "", fetching: false };
+let view = "run";
+
+/* ---------- on-device database ---------- */
+const IDB = (() => {
+  let dbp;
+  const open = () => dbp || (dbp = new Promise((res, rej) => {
+    const r = indexedDB.open("frome-o", 1);
+    r.onupgradeneeded = () => { const d = r.result;
+      d.createObjectStore("events", { keyPath: "id" }); d.createObjectStore("entries", { keyPath: "key" }); d.createObjectStore("maps"); };
+    r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+  }));
+  const tx = async (store, mode, fn) => { const d = await open(); return new Promise((res, rej) => {
+    const t = d.transaction(store, mode); const out = fn(t.objectStore(store));
+    t.oncomplete = () => res(out && "result" in out ? out.result : out); t.onerror = () => rej(t.error); t.onabort = () => rej(t.error);
+  }); };
+  return {
+    all: st => tx(st, "readonly", s => s.getAll()),
+    get: (st, k) => tx(st, "readonly", s => s.get(k)),
+    put: (st, v, k) => tx(st, "readwrite", s => k === undefined ? s.put(v) : s.put(v, k)),
+    del: (st, k) => tx(st, "readwrite", s => s.delete(k)),
+  };
+})();
+async function loadEvents() {
+  S.events = (await IDB.all("events")).sort((a, b) => (b.date || "").localeCompare(a.date || "") || (b.createdAt || 0) - (a.createdAt || 0));
+  S.eventsLoaded = true;
+}
+async function loadEntries(id) {
+  S.allEntries = (await IDB.all("entries")).filter(e => e.eventId === id);
+  S.entries = S.allEntries.filter(e => !e.deleted); S.entriesLoaded = true;
+}
+
+/* ---------- helpers ---------- */
+const CODECH = "ACDEFHJKLMNPRTUVWXY3479", LETTERS = "abcdefghjkmnpqrstuvwxyz";
+const rnd = (len, set) => Array.from({ length: len }, () => set[Math.floor(Math.random() * set.length)]).join("");
+const pad = n => String(n).padStart(2, "0");
+function fmtDur(ms) {
+  if (ms == null || isNaN(ms)) return "–";
+  const neg = ms < 0; let s = Math.floor(Math.abs(ms) / 1000);
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60); s %= 60;
+  return (neg ? "−" : "") + (h ? `${h}:${pad(m)}:${pad(s)}` : `${m}:${pad(s)}`);
+}
+const fmtClock = ms => { const d = new Date(ms); return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`; };
+const fmtDate = iso => iso ? new Date(iso + "T12:00").toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", year: "numeric" }) : "No date";
+const today = () => { const d = new Date(); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; };
+let toastT;
+function toast(msg, kind) {
+  const t = $("#toast"); t.textContent = msg; t.className = "toast on" + (kind ? " " + kind : "");
+  clearTimeout(toastT); toastT = setTimeout(() => t.className = "toast", 2600);
+  if (kind && navigator.vibrate) try { navigator.vibrate(kind === "good" ? 70 : [60, 60, 60]); } catch (e) {}
+}
+function qrSvg(text) {
+  if (typeof qrcode !== "function") return null;
+  const q = qrcode(0, "M"); q.addData(text); q.make();
+  return q.createSvgTag({ cellSize: 4, margin: 2, scalable: true });
+}
+function saveFile(name, data, type) {
+  const a = document.createElement("a"); a.href = URL.createObjectURL(data instanceof Blob ? data : new Blob([data], { type }));
+  a.download = name; document.body.append(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+}
+const safeName = s => (s || "event").replace(/[^\w-]+/g, "-");
+const evById = id => S.events.find(e => e.id === id);
+const appLink = () => location.origin + location.pathname + "#run";
+
+/* ---------- courses and entry types ---------- */
+const coursesOf = ev => (ev && ev.courses && ev.courses.length) ? ev.courses : [{ id: "c1", name: "Course", limitMin: (ev && ev.limitMin) || 60 }];
+const courseOf = (ev, id) => coursesOf(ev).find(c => c.id === id) || coursesOf(ev)[0];
+const manualCode = (ev, c) => `${ev.id.toUpperCase()}-${c.id.slice(1)}-${c.limitMin}`;
+const TYPES = { solo: "Solo", pair: "Pair", group: "Group" };
+const typeLabel = (t, n) => t === "group" ? `Group of ${n || "?"}` : TYPES[t] || "Solo";
+
+/* ---------- QR payloads ---------- */
+const P = {
+  start: (ev, c) => `FOC2|S|${ev.id}|${encodeURIComponent(ev.name || "")}|${c.id}|${encodeURIComponent(c.name || "")}|${c.limitMin || 0}`,
+  control: (ev, c) => `FOC2|C|${ev.id}|${c.n}|${c.code}`,
+  finish: ev => `FOC2|F|${ev.id}`,
+  result: r => `FOC2|R|${r.eventId}|${r.runId}|${encodeURIComponent(r.name)}|${r.course || ""}|${r.type || "solo"}|${r.size || 1}|` +
+    `${Math.round(r.start / 1000)}|${Math.round((r.finish - r.start) / 1000)}|` +
+    r.punches.map(p => `${p.n}.${p.code}.${Math.round(p.t / 1000)}`).join(",") + `|${(r.members || []).map(x => x || "").join(",")}`,
+  parse(text) { const p = String(text || "").trim().split("|"); return p[0] === "FOC2" ? { kind: p[1], parts: p.slice(2) } : null; }
+};
+
+/* ---------- runner: run kept on this phone ---------- */
+const RUNKEY = "foc-run", NAMEKEY = "foc-name", OUTKEY = "foc-outbox", TYPEKEY = "foc-type", SIZEKEY = "foc-size";
+const ls = { get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
+  set(k, v) { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} } };
+let run = ls.get(RUNKEY, null);
+const saveRun = r => ls.set(RUNKEY, r);
+const runnerType = () => { const t = ls.get(TYPEKEY, "solo"); return TYPES[t] ? t : "solo"; };
+function runnerSize(t) {
+  if (t === "solo") return 1; if (t === "pair") return 2;
+  const v = Math.round(+($("#runSize")?.value || ls.get(SIZEKEY, 3)));
+  return Math.max(3, Math.min(30, v || 3));
+}
+
+function beginRun(eventId, eventName, courseId, courseName, limitMin) {
+  const who = whoIsRunning();
+  if (who.err) { toast(who.err, "badt"); return false; }
+  const { name, type, size, members } = who;
+  if (type === "group") ls.set(SIZEKEY, size);
+  if (who.newName) { ls.set(JOINKEY, who.newName); sendJoin(); }
+  courseId = courseId || "c1";
+  run = { runId: `${Math.round(Date.now() / 1000)}-${rnd(4, LETTERS)}`, eventId, eventName: eventName || `Event ${eventId.toUpperCase()}`,
+    course: courseId, courseName: courseName || `Course ${courseId.slice(1)}`, limitMin: +limitMin || 0,
+    name, type, size, members, start: Date.now(), finish: null, punches: [], startSent: false, uploaded: false, warned5: false, warned0: false };
+  saveRun(run);
+  if (SHEET) queueResult(run); // tells the organiser you're out on the course
+  toast("Clock started. Good luck!", "good"); render(true); return true;
+}
+function addPunch(n, code) {
+  if (!run || run.finish) return false;
+  if (run.punches.some(p => p.n === n)) { toast(`You already punched ${n}`, "badt"); return false; }
+  run.punches.push({ n, code: code.toUpperCase(), t: Date.now() - run.start });
+  saveRun(run); toast(`Control ${n} punched`, "good"); render(true); return true;
+}
+function finishRun() {
+  if (!run || run.finish) return;
+  run.finish = Date.now(); saveRun(run); toast("Finished", "good");
+  if (SHEET) queueResult(run);
+  render(true);
+}
+
+/* ---------- runner: time warnings ---------- */
+let actx = null;
+function unlockAudio() { try { actx = actx || new (window.AudioContext || window.webkitAudioContext)(); actx.resume(); } catch (e) {} }
+function beep(times) {
+  if (!actx) return;
+  try {
+    for (let i = 0; i < times; i++) {
+      const o = actx.createOscillator(), g = actx.createGain(), t = actx.currentTime + i * 0.35;
+      o.frequency.value = 880; o.connect(g); g.connect(actx.destination);
+      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.4, t + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.25);
+      o.start(t); o.stop(t + 0.3);
+    }
+  } catch (e) {}
+}
+function alertRunner(msg, pattern, times) {
+  toast(msg, "badt");
+  if (navigator.vibrate) try { navigator.vibrate(pattern); } catch (e) {}
+  beep(times);
+}
+
+/* ---------- runner: auto-upload with retry ---------- */
+const resultBody = r => ({ runId: r.runId, eventId: r.eventId, name: r.name, course: r.course, courseName: r.courseName,
+  type: r.type, size: r.size, members: r.members || [], start: r.start, finish: r.finish || null, punches: r.finish ? r.punches : [] });
+function queueResult(r) { ls.set(OUTKEY, ls.get(OUTKEY, []).filter(x => x.runId !== r.runId).concat([resultBody(r)])); sendOutbox(); }
+let sending = false;
+async function sendOutbox() {
+  if (!SHEET || sending || !ls.get(OUTKEY, []).length) return;
+  sending = true; render();
+  for (const r of ls.get(OUTKEY, [])) {
+    try {
+      const j = await (await fetch(SHEET, { method: "POST", body: JSON.stringify(r) })).json();
+      if (j.ok) {
+        // only clear this exact message: a finish queued while the start was sending must still go
+        ls.set(OUTKEY, ls.get(OUTKEY, []).filter(x => !(x.runId === r.runId && x.finish === r.finish)));
+        if (run && run.runId === r.runId) { if (r.finish) run.uploaded = true; else run.startSent = true; saveRun(run); }
+      }
+    } catch (e) { /* no signal: try again later */ }
+  }
+  sending = false; render();
+}
+window.addEventListener("online", sendOutbox);
+setInterval(sendOutbox, 30000);
+
+/* ---------- club member list ---------- */
+const MEMKEY = "foc-members", TEAMKEY = "foc-team", NEWKEY = "foc-newname", TEAMNAMEKEY = "foc-teamname", JOINKEY = "foc-join";
+S.members = ls.get(MEMKEY, []) || []; S.pendingMembers = []; S.membersAt = 0;
+const useList = () => !!(SHEET && S.members.length);
+const memberName = id => (S.members.find(m => m.id === id) || {}).name;
+const memberIdFor = name => { const lc = String(name || "").trim().toLowerCase(); return (S.members.find(m => m.name.trim().toLowerCase() === lc) || {}).id || null; };
+const joinNames = a => a.length <= 1 ? (a[0] || "") : a.slice(0, -1).join(", ") + " & " + a[a.length - 1];
+async function fetchMembers(force) {
+  if (!SHEET || (!force && Date.now() - S.membersAt < 300000)) return;
+  S.membersAt = Date.now();
+  try {
+    const j = await (await fetch(`${SHEET}?members=1`)).json();
+    if (j.ok) { S.members = j.members || []; S.pendingMembers = j.pending || []; ls.set(MEMKEY, S.members); render(); }
+  } catch (e) { /* offline: keep the saved list */ }
+}
+async function sendJoin() {
+  const name = ls.get(JOINKEY, null); if (!SHEET || !name) return;
+  try { const j = await (await fetch(SHEET, { method: "POST", body: JSON.stringify({ action: "join", name }) })).json(); if (j.ok) ls.set(JOINKEY, null); } catch (e) {}
+}
+setInterval(sendJoin, 30000);
+
+function slotsFor(t) { return t === "solo" ? 1 : t === "pair" ? 2 : runnerSize("group"); }
+// Works out who is running from the picker (or the typed name when there's no member list).
+function whoIsRunning() {
+  const t = runnerType(), n = slotsFor(t);
+  if (!useList()) {
+    const name = ($("#runName")?.value || ls.get(NAMEKEY, "")).trim();
+    return name ? { name: name.slice(0, 60), type: t, size: n, members: [] } : { err: "Add your name first" };
+  }
+  const team = ls.get(TEAMKEY, []) || [], names = [], members = []; let guests = 0, newName = "";
+  for (let i = 0; i < n; i++) {
+    const v = team[i] || "";
+    if (!v) return { err: n === 1 ? "Choose your name first" : i === 0 ? "Choose your own name first" : `Choose person ${i + 1}, or pick Guest` };
+    if (v === "new") {
+      newName = String(ls.get(NEWKEY, "") || "").trim().replace(/\s+/g, " ");
+      if (!newName) return { err: "Type your name so the organiser can add you" };
+      names.push(newName); members.push(null);
+    } else if (v === "guest") { guests++; members.push(null); }
+    else if (memberName(v)) {
+      if (members.includes(v)) return { err: `${memberName(v)} is picked twice` };
+      names.push(memberName(v)); members.push(v);
+    } else return { err: "Choose who’s running" };
+  }
+  if (guests) names.push(guests === 1 ? "guest" : `${guests} guests`);
+  const teamName = t === "solo" ? "" : String(ls.get(TEAMNAMEKEY, "") || "").trim();
+  return { name: (teamName || joinNames(names)).slice(0, 60), type: t, size: n, members, newName };
+}
+function memberPickers(t) {
+  const n = slotsFor(t), team = ls.get(TEAMKEY, []) || [];
+  const sorted = [...S.members].sort((a, b) => a.name.localeCompare(b.name));
+  const set = (i, v) => { const tm = ls.get(TEAMKEY, []) || []; tm[i] = v; ls.set(TEAMKEY, tm); render(true); };
+  const out = [];
+  for (let i = 0; i < n; i++) out.push(el("label", { class: "f" },
+    el("span", null, i === 0 ? (t === "solo" ? "Your name" : "You") : `Person ${i + 1}`),
+    el("select", { id: `runSlot${i}`, onchange: e => set(i, e.target.value) },
+      el("option", { value: "" }, "Choose…"),
+      sorted.map(m => el("option", { value: m.id, selected: team[i] === m.id }, m.name)),
+      i === 0 ? el("option", { value: "new", selected: team[0] === "new" }, "I’m not on the list")
+              : el("option", { value: "guest", selected: team[i] === "guest" }, "Guest (not a club member)"))));
+  if (team[0] === "new") out.push(el("label", { class: "f" }, el("span", null, "Your full name"),
+      el("input", { type: "text", id: "newName", maxlength: 60, autocomplete: "name", value: ls.get(NEWKEY, "") || "", oninput: e => ls.set(NEWKEY, e.target.value) })),
+    el("p", { class: "small muted" }, "You can still run today. Your name goes to the organiser to add to the club list."));
+  if (t !== "solo") out.push(el("label", { class: "f" }, el("span", null, "Team name (optional)"),
+    el("input", { type: "text", id: "teamName", maxlength: 60, value: ls.get(TEAMNAMEKEY, "") || "", placeholder: "Leave blank to use your names", oninput: e => ls.set(TEAMNAMEKEY, e.target.value) })));
+  return out;
+}
+
+/* organiser: keep the list */
+function newMemberId(list) { let id; do { id = rnd(5, LETTERS); } while (list.some(m => m.id === id)); return id; }
+async function saveMembers(members, dismissed = []) {
+  const key = String(ls.get(KEYKEY, "") || "").trim();
+  if (!key) { toast("Add your publishing password above first", "badt"); return false; }
+  try {
+    const j = await (await fetch(SHEET, { method: "POST", body: JSON.stringify({ action: "members", key, members, dismissed }) })).json();
+    if (!j.ok) { toast(j.error === "wrong password" ? "The publishing password doesn’t match the one in your Google Sheet script" : j.error === "no password set" ? "Set PUBLISH_PASSWORD in your Google Sheet script first" : "The sheet refused that. Try again.", "badt"); return false; }
+    S.members = j.members || []; S.pendingMembers = j.pending || []; ls.set(MEMKEY, S.members); render(true); return true;
+  } catch (e) { toast("Couldn’t reach the sheet. Check your signal and try again.", "badt"); return false; }
+}
+function membersSection() {
+  const sorted = [...S.members].sort((a, b) => a.name.localeCompare(b.name));
+  const ta = el("textarea", { id: "addNames", rows: 4, placeholder: "One name per line" });
+  const pend = S.pendingMembers;
+  return el("div", { class: "sec" }, el("h2", null, `Club members (${S.members.length})`),
+    el("p", { class: "small muted" }, "Runners pick their name from this list instead of typing it, so each person counts as one in the league however they’re spelled. Only names are stored."),
+    pend.length ? el("div", { class: "out" }, el("h3", null, `${pend.length} asking to join`),
+      el("ul", null, pend.map(p => el("li", null, el("span", { class: "nm" }, p.name),
+        el("button", { class: "btn go", onclick: async () => { if (await saveMembers([...S.members, { id: newMemberId(S.members), name: p.name }], [p.name])) toast(`${p.name} added`, "good"); } }, "Add"),
+        el("button", { class: "btn quiet", onclick: () => saveMembers(S.members, [p.name]) }, "Dismiss")))),
+      el("p", { class: "small muted" }, "Dismiss anyone already on the list under another spelling, then fix their result with Edit name.")) : null,
+    el("label", { class: "f" }, el("span", null, "Add names (paste a list, one per line)"), ta),
+    el("button", { class: "btn quiet", onclick: async () => {
+      const have = new Set(S.members.map(m => m.name.trim().toLowerCase())), add = [], all = [...S.members];
+      for (const line of ta.value.split(/[\n,]+/)) {
+        const nm = line.trim().replace(/\s+/g, " ").slice(0, 60);
+        if (nm && !have.has(nm.toLowerCase())) { have.add(nm.toLowerCase()); const m = { id: newMemberId(all), name: nm }; all.push(m); add.push(m); }
+      }
+      if (!add.length) { toast("Nothing new to add", "badt"); return; }
+      if (await saveMembers(all)) toast(`${add.length} name${add.length > 1 ? "s" : ""} added`, "good");
+    } }, "Add to list"),
+    S.members.length ? el("details", { class: "mem", open: !!S.memOpen, ontoggle: e => { S.memOpen = e.target.open; } },
+      el("summary", null, "Edit or remove names"),
+      sorted.map(m => el("div", { class: "memrow" },
+        el("input", { type: "text", id: `mem-${m.id}`, value: m.name, maxlength: 60, "aria-label": `Name for ${m.name}`, onchange: async e => {
+          const v = e.target.value.trim().replace(/\s+/g, " ");
+          if (!v) { e.target.value = m.name; return; }
+          if (await saveMembers(S.members.map(x => x.id === m.id ? { ...x, name: v } : x))) toast("Renamed everywhere, including past results", "good");
+        } }),
+        el("button", { class: "btn quiet", onclick: () => { if (confirm(`Remove ${m.name} from the list? Their past results stay.`)) saveMembers(S.members.filter(x => x.id !== m.id)); } }, "Remove")))) : null);
+}
+
+/* ---------- runner screens ---------- */
+function startScan() {
+  unlockAudio();
+  const who = whoIsRunning();
+  if (who.err) { toast(who.err, "badt"); return; }
+  if (!useList()) ls.set(NAMEKEY, who.name);
+  openScanner("Scan the start code for your course", "Start code, e.g. ABCD-1-60", text => {
+    const p = P.parse(text);
+    if (!p || p.kind !== "S") { toast("That isn’t a start code", "badt"); return false; }
+    const [id, enc, cid, cenc, lim] = p.parts;
+    return beginRun(id, decodeURIComponent(enc || ""), cid, decodeURIComponent(cenc || ""), lim);
+  }, typed => {
+    const m = typed.trim().match(/^([a-z]{4})\s*-\s*(\d+)\s*-\s*(\d+)$/i);
+    return m ? `FOC2|S|${m[1].toLowerCase()}||c${m[2]}||${m[3]}` : null;
+  });
+}
+function controlScan() {
+  unlockAudio();
+  openScanner("Scan a control", "Control code, e.g. 14-K7X", text => {
+    const p = P.parse(text);
+    if (!p) { toast("That isn’t a control code", "badt"); return false; }
+    if (p.parts[0] !== run.eventId) { toast("That code is for a different event", "badt"); return false; }
+    if (p.kind === "F") { closeScanner(); if (confirm("Finish now and stop the clock?")) finishRun(); return true; }
+    if (p.kind !== "C") { toast("That isn’t a control code", "badt"); return false; }
+    return addPunch(+p.parts[1], p.parts[2]);
+  }, typed => {
+    const m = typed.trim().match(/^(\d+)\W*([A-Z0-9]{3})$/i);
+    return m ? `FOC2|C|${run.eventId}|${m[1]}|${m[2].toUpperCase()}` : null;
+  });
+}
+const installed = () => matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+
+function renderRun() {
+  if (!run) {
+    const t = runnerType();
+    return [
+      el("h1", null, "Ready to run"),
+      el("p", { class: "muted" }, "Choose how you’re running, add your name, then scan the start code for your course. Your clock starts the moment it scans."),
+      el("p", { class: "small muted", style: "margin:14px 0 4px" }, "Running as"),
+      el("div", { class: "seg", role: "group", "aria-label": "Running as" }, Object.entries(TYPES).map(([k, v]) =>
+        el("button", { type: "button", "aria-pressed": String(t === k), onclick: () => { ls.set(TYPEKEY, k); render(true); } }, v))),
+      t === "group" ? el("label", { class: "f" }, el("span", null, "How many in your group?"),
+        el("input", { type: "number", id: "runSize", min: 3, max: 30, inputmode: "numeric", value: String(ls.get(SIZEKEY, 3)), oninput: e => ls.set(SIZEKEY, e.target.value), onchange: () => render(true) })) : null,
+      useList() ? memberPickers(t) : el("label", { class: "f" }, el("span", null, t === "solo" ? "Your name" : "Team name, or everyone’s names"),
+        el("input", { type: "text", id: "runName", value: ls.get(NAMEKEY, ""), autocomplete: t === "solo" ? "name" : "off", maxlength: 60, oninput: e => ls.set(NAMEKEY, e.target.value) })),
+      el("button", { class: "btn go big", onclick: startScan }, "Scan start code"),
+      el("p", { class: "small muted", style: "margin-top:18px" }, "No camera? The scanner also lets you type the code printed under each QR."),
+      SHEET ? el("p", { style: "margin-top:18px" }, el("a", { href: "#results-live", class: "link" }, "See club results and the season league")) : null,
+      installed() ? null : el("p", { class: "small muted" }, "Tip: add this page to your home screen before you head out, so it opens without signal.")];
+  }
+
+  if (!run.finish) {
+    const out = [el("div", { class: "who" }, el("h2", null, run.name),
+        el("span", { class: "muted small" }, run.courseName + (run.type !== "solo" ? `, ${typeLabel(run.type, run.size).toLowerCase()}` : ""))),
+      el("div", { id: "banner", hidden: true, role: "status" }),
+      el("div", { class: "clockbox" }, el("div", { class: "clock", id: "clock" }, fmtDur(Date.now() - run.start)),
+        run.limitMin ? el("div", { class: "remain", id: "remain" }) : null),
+      SHEET && !run.startSent ? el("p", { class: "small muted", style: "text-align:center" }, "Your start hasn’t reached the organiser yet. It sends by itself when you have signal.") : null,
+      el("button", { class: "btn go big", onclick: controlScan }, "Scan control"),
+      el("div", { class: "sec" }, el("h3", null, `${run.punches.length} control${run.punches.length === 1 ? "" : "s"} punched`),
+        run.punches.length ? el("ul", { class: "punches" }, [...run.punches].reverse().map(p =>
+          el("li", null, el("span", { class: "ring" }, p.n), el("span", { class: "muted small" }, `at ${fmtClock(run.start + p.t)}`), el("span", { class: "t" }, fmtDur(p.t)))))
+        : el("p", { class: "muted" }, "Punched controls appear here.")),
+      el("div", { class: "sec" }, el("button", { class: "btn big", onclick: () => { if (confirm("Finish now and stop the clock?")) finishRun(); } }, "Finish"))];
+    setTimeout(updateClock, 0);
+    return out;
+  }
+
+  const svg = qrSvg(P.result(run));
+  let status;
+  if (!SHEET) status = el("p", { style: "text-align:center" }, "Show this code at download so your result goes into the results.");
+  else if (run.uploaded) status = el("p", { class: "status sent" }, "Result sent to the organiser. Keep this screen in case they ask for the code.");
+  else status = el("div", { class: "status" },
+    el("p", null, sending ? "Sending your result…" : "Not sent yet. It will send by itself when you have signal, or show this code at download."),
+    sending ? null : el("button", { class: "btn quiet", onclick: sendOutbox }, "Try sending now"));
+  return [el("h1", null, "Finished"),
+    el("p", { class: "muted" }, run.courseName),
+    el("div", { class: "clockbox" }, el("div", { class: "clock" }, fmtDur(run.finish - run.start)),
+      el("div", { class: "remain" }, `${run.punches.length} controls punched`)),
+    status,
+    svg ? el("div", { class: "qrbox", html: svg, role: "img", "aria-label": "Your result code" }) : el("p", { class: "bad" }, "The code couldn’t be drawn. Read your controls to the organiser instead."),
+    el("ul", { class: "punches" }, run.punches.map(p => el("li", null, el("span", { class: "ring" }, p.n), el("span", { class: "t" }, fmtDur(p.t))))),
+    el("div", { class: "sec" }, el("button", { class: "btn quiet big", onclick: () => {
+      const msg = run.uploaded || !SHEET ? "Clear this run from your phone? Make sure the organiser has your result first." : "Your result hasn’t sent yet. It will keep trying in the background. Clear this run from the screen?";
+      if (confirm(msg)) { run = null; saveRun(null); render(true); }
+    } }, "Start a new run")),
+    SHEET ? el("p", { style: "text-align:center" }, el("a", { href: "#results-live", class: "link" }, "Club results appear here once the organiser publishes them")) : null];
+}
+function updateClock() {
+  if (!run || run.finish) return;
+  const c = $("#clock"); if (c) c.textContent = fmtDur(Date.now() - run.start);
+  if (!run.limitMin) return;
+  const left = run.limitMin * 60000 - (Date.now() - run.start);
+  const r = $("#remain");
+  if (r) {
+    r.textContent = left >= 0 ? `${fmtDur(left)} left` : `${fmtDur(-left)} over time`;
+    r.className = "remain" + (left < 0 ? " over" : left < 300000 ? " warn" : "");
+  }
+  const b = $("#banner");
+  if (b) {
+    if (left <= 0) { b.hidden = false; b.className = "banner over"; b.textContent = "Time’s up. Head to the finish."; }
+    else if (left <= 300000) { b.hidden = false; b.className = "banner warn"; b.textContent = "Under 5 minutes left"; }
+    else b.hidden = true;
+  }
+  if (left <= 0 && !run.warned0) { run.warned0 = run.warned5 = true; saveRun(run); alertRunner("Time’s up. Head to the finish", [500, 150, 500, 150, 500], 3); }
+  else if (left <= 300000 && left > 0 && !run.warned5) { run.warned5 = true; saveRun(run); alertRunner("5 minutes left", [250, 120, 250], 2); }
+}
+setInterval(updateClock, 250);
+
+/* ---------- scanner ---------- */
+let stream = null, scanning = false, detector = null, onScan = null, toPayload = null, lastText = "", lastAt = 0;
+const video = $("#video"), cv = $("#cv"), cx = cv.getContext("2d", { willReadFrequently: true });
+async function openScanner(title, placeholder, handler, manual) {
+  $("#scanTitle").textContent = title; $("#manualIn").placeholder = placeholder || ""; $("#manualIn").value = "";
+  onScan = handler; toPayload = manual; $("#manualRow").hidden = !manual; $("#scanner").hidden = false;
+  $("#scanMsg").textContent = "Starting camera…";
+  try { stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false }); }
+  catch (e) { $("#scanMsg").textContent = "The camera isn’t available. Allow camera access, or type the code printed under the QR."; return; }
+  if ($("#scanner").hidden) { stopStream(); return; }
+  video.srcObject = stream; try { await video.play(); } catch (e) {}
+  try { detector = ("BarcodeDetector" in window) ? new BarcodeDetector({ formats: ["qr_code"] }) : null; } catch (e) { detector = null; }
+  if (!detector && typeof jsQR !== "function") { $("#scanMsg").textContent = "The scanner didn’t load. Open the app once with signal, or type the code."; return; }
+  $("#scanMsg").textContent = "Hold the code inside the frame."; scanning = true; tick();
+}
+async function tick() {
+  if (!scanning) return;
+  let text = null;
+  if (video.readyState >= 2 && video.videoWidth) {
+    if (detector) { try { const r = await detector.detect(video); if (r[0]) text = r[0].rawValue; } catch (e) {} }
+    else {
+      const w = Math.min(640, video.videoWidth), h = Math.round(video.videoHeight * w / video.videoWidth);
+      cv.width = w; cv.height = h; cx.drawImage(video, 0, 0, w, h);
+      const r = jsQR(cx.getImageData(0, 0, w, h).data, w, h, { inversionAttempts: "dontInvert" });
+      if (r) text = r.data;
+    }
+  }
+  if (text && !(text === lastText && Date.now() - lastAt < 2500)) {
+    lastText = text; lastAt = Date.now();
+    if (onScan(text) && scanning) closeScanner();
+  }
+  if (scanning) setTimeout(tick, 160);
+}
+function stopStream() { scanning = false; if (stream) stream.getTracks().forEach(t => t.stop()); stream = null; video.srcObject = null; }
+function closeScanner() { stopStream(); $("#scanner").hidden = true; }
+$("#scanClose").onclick = closeScanner;
+function useManual() {
+  const typed = $("#manualIn").value; if (!typed.trim()) return;
+  const payload = toPayload ? toPayload(typed) : typed;
+  if (!payload) { toast("That code doesn’t look right. Check the letters under the QR.", "badt"); return; }
+  if (onScan(payload)) closeScanner(); else $("#manualIn").select();
+}
+$("#manualGo").onclick = useManual;
+$("#manualIn").addEventListener("keydown", e => { if (e.key === "Enter") useManual(); });
+
+/* ---------- organiser: events ---------- */
+const failed = () => toast("That didn’t save. The device may be out of storage.", "badt");
+async function updateEvent(id, patch) {
+  const ev = evById(id); if (!ev) return;
+  Object.assign(ev, patch);
+  try { await IDB.put("events", ev); } catch (e) { failed(); }
+  await loadEvents(); render();
+}
+const cloneCtrls = ev => (ev.controls || []).map(c => ({ ...c }));
+const cloneCourses = ev => coursesOf(ev).map(c => ({ ...c }));
+
+async function createEvent(form) {
+  let id; do { id = rnd(4, LETTERS); } while (evById(id));
+  const ev = { id, name: form.name.value.trim() || "Score event", date: form.date.value || "",
+    penaltyPerMin: Math.max(0, +form.pen.value || 0), bonus: Math.max(0, +form.bonus.value || 0),
+    courses: [{ id: "c1", name: "2.5 km", limitMin: 60 }, { id: "c2", name: "5 km", limitMin: 60 }],
+    controls: [], hasMap: false, createdAt: Date.now() };
+  try { await IDB.put("events", ev); } catch (e) { failed(); return; }
+  await loadEvents(); S.newOpen = false; S.editing = id; render(true); toast("Event created. Set your course time limits next.", "good");
+}
+
+function renderEvents() {
+  if (S.editing && evById(S.editing)) return renderEdit(evById(S.editing));
+  S.editing = null;
+  const out = [el("div", { class: "row" }, el("h1", null, "Events"),
+    el("button", { class: "btn go", style: "flex:0 0 auto", onclick: () => { S.newOpen = !S.newOpen; render(true); } }, S.newOpen ? "Cancel" : "New event"))];
+  if (S.newOpen) {
+    const f = el("form", { class: "panel", onsubmit: e => { e.preventDefault(); createEvent(f); } },
+      el("h2", null, "New score event"),
+      el("label", { class: "f" }, el("span", null, "Event name"), el("input", { type: "text", name: "name", required: true, placeholder: "Victoria Park score" })),
+      el("div", { class: "grid2" },
+        el("label", { class: "f" }, el("span", null, "Date"), el("input", { type: "date", name: "date", value: today() })),
+        el("label", { class: "f" }, el("span", null, "Penalty per minute late (points)"), el("input", { type: "number", name: "pen", min: 0, value: "10", inputmode: "numeric" })),
+        el("label", { class: "f" }, el("span", null, "Bonus for finishing in time (points, 0 for none)"), el("input", { type: "number", name: "bonus", min: 0, value: "0", inputmode: "numeric" }))),
+      el("p", { class: "small muted" }, "It starts with two courses, 2.5 km and 5 km, using the same controls. Set their time limits next."),
+      el("button", { class: "btn go", type: "submit" }, "Create event"));
+    out.push(f);
+  }
+  if (!S.eventsLoaded) out.push(el("p", { class: "muted" }, "Loading events…"));
+  else if (!S.events.length) out.push(el("p", { class: "muted", style: "margin-top:20px" }, "No events yet. Create one, add your controls, then download the control sheet to print."));
+  else out.push(el("div", null, S.events.map(ev => el("div", { class: "ev" },
+    el("span", { class: "flag", "aria-hidden": "true" }),
+    el("div", { class: "meta" }, el("h3", null, ev.name), el("div", { class: "small muted" },
+      `${fmtDate(ev.date)}, ${(ev.controls || []).length} controls, ${coursesOf(ev).length} course${coursesOf(ev).length === 1 ? "" : "s"}`)),
+    el("div", { class: "acts" },
+      el("button", { class: "btn quiet", onclick: () => { S.editing = ev.id; S.placing = false; render(true); scrollTo(0, 0); } }, "Edit"),
+      el("button", { class: "btn quiet", onclick: () => { S.resultsId = ev.id; location.hash = "results"; } }, "Results"))))));
+
+  out.push(el("div", { class: "sec" }, el("h2", null, "Auto-upload"),
+    SHEET ? [el("p", { class: "ok" }, "On. Runners’ starts and results go to your Google Sheet and appear in Results."),
+      el("button", { class: "btn quiet", onclick: testSheet }, "Test connection"),
+      el("h3", { style: "margin-top:20px" }, "Results page"),
+      el("p", { class: "small muted" }, "Share this link in Spond. It always shows the latest published results and the season league."),
+      el("div", { class: "row" }, el("input", { type: "text", id: "liveUrl", readonly: true, value: location.origin + location.pathname + "#results-live", onfocus: e => e.target.select() }),
+        el("button", { class: "btn quiet", style: "flex:0 0 auto", onclick: async () => {
+          const v = location.origin + location.pathname + "#results-live";
+          try { await navigator.clipboard.writeText(v); toast("Link copied", "good"); } catch (e) { $("#liveUrl").select(); }
+        } }, "Copy link")),
+      el("label", { class: "f" }, el("span", null, "Publishing password (the one you set in your Google Sheet script)"),
+        el("input", { type: "text", id: "pubKey", autocomplete: "off", value: ls.get(KEYKEY, ""), onchange: e => { ls.set(KEYKEY, e.target.value.trim()); toast("Saved on this phone", "good"); } }))]
+      : el("p", { class: "muted small" }, "Off. Paste your Google Sheet link into index.html to turn it on (see the setup guide). Scanning finish codes works without it, but the still-out list only shows paper runners.")));
+
+  if (SHEET) { fetchMembers(); out.push(membersSection()); }
+  const fi = el("input", { type: "file", accept: "application/json,.json", hidden: true, onchange: e => { const f = e.target.files[0]; if (f) importBackup(f); e.target.value = ""; } });
+  out.push(el("div", { class: "sec" }, el("h2", null, "Backup"),
+    el("p", { class: "small muted" }, "Events, maps and results are saved on this device only. Download a backup after each event, and restore it on a new phone or laptop."),
+    el("div", { class: "row" }, el("button", { class: "btn quiet", onclick: exportBackup }, "Download backup"),
+      el("button", { class: "btn quiet", onclick: () => fi.click() }, "Restore backup"), fi)));
+  if (SHEET) out.push(el("div", { class: "sec" }, el("h2", null, "Lock this phone"),
+    el("p", { class: "small muted" }, "Turns organiser mode off here, for example on a borrowed phone. Events and results stay saved, and come back when you sign in again with the password."),
+    el("button", { class: "btn quiet", onclick: () => {
+      if (!confirm("Lock organiser mode on this phone? You’ll need the password to get back in.")) return;
+      ls.set("foc-org", false); ls.set(KEYKEY, null); S.editing = null; location.hash = "run"; route(); render(true); toast("Organiser mode locked");
+    } }, "Lock organiser mode")));
+  return out;
+}
+
+async function testSheet() {
+  try { const j = await (await fetch(SHEET + "?event=test")).json(); toast(j.ok ? "Connected to your sheet" : "The sheet replied with an error", j.ok ? "good" : "badt"); }
+  catch (e) { toast("Couldn’t reach the sheet. Check the link in index.html and your signal.", "badt"); }
+}
+
+function getMapUrl(ev) {
+  if (!ev.hasMap) return null;
+  if (S.mapUrls[ev.id]) return S.mapUrls[ev.id];
+  IDB.get("maps", ev.id).then(b => { if (b) { S.mapUrls[ev.id] = URL.createObjectURL(b); render(); } });
+  return null;
+}
+
+function renderEdit(ev) {
+  const out = [el("button", { class: "link", onclick: () => { S.editing = null; S.placing = false; render(true); } }, "Back to events")];
+  const field = (label, key, type, attrs = {}) => el("label", { class: "f" }, el("span", null, label),
+    el("input", { type, value: String(ev[key] ?? ""), ...attrs, onchange: e => {
+      let v = e.target.value; if (type === "number") v = Math.max(0, +v || 0);
+      updateEvent(ev.id, { [key]: v });
+    } }));
+  out.push(el("h1", null, ev.name),
+    el("div", { class: "panel" }, field("Event name", "name", "text"),
+      el("div", { class: "grid2" }, field("Date", "date", "date"),
+        field("Penalty per minute late (points)", "penaltyPerMin", "number", { min: 0, inputmode: "numeric" }),
+        field("Bonus for finishing in time (points, 0 for none)", "bonus", "number", { min: 0, inputmode: "numeric" }))));
+
+  // courses
+  const courses = coursesOf(ev);
+  const cSec = el("div", { class: "sec" }, el("h2", null, "Courses"),
+    el("p", { class: "small muted" }, "Each course gets its own start card, time limit and results. Runners can visit any control."),
+    el("div", { class: "course small muted" }, el("span", null, "Name"), el("span", null, "Time limit (min)"), el("span", null, "")));
+  courses.forEach(c => cSec.append(el("div", { class: "course" },
+    el("input", { type: "text", value: c.name, "aria-label": "Course name", onchange: e => {
+      const cs = cloneCourses(ev); cs.find(o => o.id === c.id).name = e.target.value.trim() || c.name; updateEvent(ev.id, { courses: cs });
+    } }),
+    el("input", { type: "number", value: String(c.limitMin), min: 1, inputmode: "numeric", "aria-label": `Time limit for ${c.name}`, onchange: e => {
+      const cs = cloneCourses(ev); cs.find(o => o.id === c.id).limitMin = Math.max(1, Math.round(+e.target.value) || 60); updateEvent(ev.id, { courses: cs });
+    } }),
+    el("button", { class: "btn quiet", disabled: courses.length < 2, onclick: () => {
+      if (confirm(`Remove ${c.name}? Any results already on it move to ${courses.find(o => o.id !== c.id).name}.`))
+        updateEvent(ev.id, { courses: cloneCourses(ev).filter(o => o.id !== c.id) });
+    } }, "Remove"))));
+  cSec.append(el("div", { style: "margin-top:10px" }, el("button", { class: "btn quiet", onclick: () => {
+    const cs = cloneCourses(ev), n = Math.max(...cs.map(c => +c.id.slice(1) || 0)) + 1;
+    cs.push({ id: "c" + n, name: `Course ${n}`, limitMin: 60 }); updateEvent(ev.id, { courses: cs });
+  } }, "Add course")),
+    el("p", { class: "small muted" }, "Start codes for typing in: " + courses.map(c => `${c.name} ${manualCode(ev, c)}`).join(", ") + "."));
+  out.push(cSec);
+
+  // map
+  const ctrls = ev.controls || [];
+  const mapSec = el("div", { class: "sec" }, el("h2", null, "Map"));
+  const url = getMapUrl(ev);
+  if (url) {
+    const img = el("img", { src: url, alt: "Event map", draggable: false });
+    const pins = ctrls.filter(c => c.x != null).map(c => el("span", { class: "pin", style: `left:${c.x * 100}%;top:${c.y * 100}%` }, el("b", null, c.n)));
+    const map = el("div", { class: "map" + (S.placing ? " placing" : ""), onclick: e => {
+      if (!S.placing) return;
+      const r = img.getBoundingClientRect(), x = (e.clientX - r.left) / r.width, y = (e.clientY - r.top) / r.height;
+      if (x >= 0 && x <= 1 && y >= 0 && y <= 1) addControl(ev, Math.round(x * 1000) / 1000, Math.round(y * 1000) / 1000);
+    } }, img, pins);
+    mapSec.append(el("p", { class: "small muted" }, S.placing ? "Tap the map to drop a control. Tap Done when you’ve placed them all." : "Turn on placing to add controls by tapping the map."),
+      el("button", { class: "btn " + (S.placing ? "go" : "quiet"), onclick: () => { S.placing = !S.placing; render(true); } }, S.placing ? "Done placing" : "Place controls on map"),
+      el("div", { style: "margin-top:10px" }, map));
+  } else if (!ev.hasMap) {
+    mapSec.append(el("p", { class: "small muted" }, "Export your map from OpenOrienteering Mapper or OCAD as a PNG or JPG and upload it here. Controls you place show as purple circles."));
+  }
+  const fi = el("input", { type: "file", accept: "image/png,image/jpeg,image/webp", hidden: true, onchange: async e => {
+    const f = e.target.files[0]; if (!f) return;
+    try { await IDB.put("maps", f, ev.id); } catch (err) { failed(); return; }
+    if (S.mapUrls[ev.id]) { URL.revokeObjectURL(S.mapUrls[ev.id]); delete S.mapUrls[ev.id]; }
+    await updateEvent(ev.id, { hasMap: true }); toast("Map added", "good");
+  } });
+  mapSec.append(fi, el("div", { style: "margin-top:10px" }, el("button", { class: "btn quiet", onclick: () => fi.click() }, ev.hasMap ? "Replace map" : "Upload map")));
+  out.push(mapSec);
+
+  // controls
+  const sum = ctrls.reduce((a, c) => a + (+c.pts || 0), 0);
+  const list = el("div", { class: "sec" }, el("h2", null, "Controls"),
+    el("p", { class: "small muted" }, ctrls.length ? `${ctrls.length} controls worth ${sum} points in total.` : "No controls yet. Add them here or by tapping the map."));
+  if (ctrls.length) {
+    list.append(el("div", { class: "ctl hdr" }, el("span", null, "Number"), el("span", null, "Points"), el("span", null, "Code"), el("span", null, "")));
+    [...ctrls].sort((a, b) => a.n - b.n).forEach(c => list.append(el("div", { class: "ctl" },
+      el("input", { type: "number", value: String(c.n), min: 1, inputmode: "numeric", "aria-label": `Number for control ${c.n}`, onchange: e => {
+        const n = +e.target.value;
+        if (!n || ctrls.some(o => o !== c && o.n === n)) { toast(`Control ${n || "?"} already exists`, "badt"); e.target.value = c.n; return; }
+        const cs = cloneCtrls(ev); cs.find(o => o.code === c.code).n = n; updateEvent(ev.id, { controls: cs });
+      } }),
+      el("input", { type: "number", value: String(c.pts), min: 0, inputmode: "numeric", "aria-label": `Points for control ${c.n}`, onchange: e => {
+        const cs = cloneCtrls(ev); cs.find(o => o.code === c.code).pts = Math.max(0, +e.target.value || 0); updateEvent(ev.id, { controls: cs });
+      } }),
+      el("span", { class: "code" }, `${c.n}-${c.code}`),
+      el("button", { class: "btn quiet", onclick: () => { if (confirm(`Remove control ${c.n}?`)) updateEvent(ev.id, { controls: cloneCtrls(ev).filter(o => o.code !== c.code) }); } }, "Remove"))));
+  }
+  list.append(el("div", { class: "row", style: "margin-top:12px" },
+    el("button", { class: "btn quiet", onclick: () => addControl(ev, null, null) }, "Add control"),
+    el("button", { class: "btn go", disabled: !ctrls.length, onclick: () => downloadSheet(ev) }, "Download control sheet")));
+  out.push(list);
+
+  out.push(volunteersSection(ev));
+  out.push(el("div", { class: "sec" }, el("h2", null, "Delete event"),
+    el("p", { class: "small muted" }, "Removes the event, its map and all its results from this device."),
+    el("button", { class: "btn danger", onclick: async () => {
+      if (!confirm(`Delete ${ev.name} and all its results? This can’t be undone.`)) return;
+      for (const en of (await IDB.all("entries")).filter(x => x.eventId === ev.id)) await IDB.del("entries", en.key);
+      await IDB.del("maps", ev.id); await IDB.del("events", ev.id);
+      S.editing = null; await loadEvents(); toast("Event deleted"); render(true);
+    } }, "Delete event")));
+  return out;
+}
+function volunteersSection(ev) {
+  const vols = ev.volunteers || [];
+  const has = id => vols.some(v => v.id === id);
+  const set = list => updateEvent(ev.id, { volunteers: list });
+  const other = el("input", { type: "text", id: "volName", maxlength: 60, list: "memberNames", placeholder: "Name" });
+  const addOther = () => {
+    const nm = other.value.trim().replace(/\s+/g, " "); if (!nm) return;
+    const id = memberIdFor(nm);
+    if (vols.some(v => (id && v.id === id) || v.name.toLowerCase() === nm.toLowerCase())) { toast(`${nm} is already listed`, "badt"); return; }
+    set([...vols, { id, name: id ? memberName(id) : nm }]);
+  };
+  const sorted = [...S.members].sort((a, b) => a.name.localeCompare(b.name));
+  return el("div", { class: "sec" }, el("h2", null, `Volunteers (${vols.length})`),
+    el("p", { class: "small muted" }, "Tick everyone who helped at this event. They’re thanked on the results page and counted in the volunteers table when you publish."),
+    sorted.length ? el("div", { class: "chips", role: "group", "aria-label": "Club members who helped" }, sorted.map(m =>
+      el("button", { class: "chip", type: "button", style: "padding:0 14px;font-size:.95rem", "aria-pressed": String(has(m.id)),
+        onclick: () => set(has(m.id) ? vols.filter(v => v.id !== m.id) : [...vols, { id: m.id, name: m.name }]) }, m.name))) : null,
+    vols.filter(v => !v.id).length ? el("div", { class: "chips" }, vols.filter(v => !v.id).map(v =>
+      el("button", { class: "chip", type: "button", style: "padding:0 14px;font-size:.95rem", "aria-pressed": "true", "aria-label": `Remove ${v.name}`,
+        onclick: () => set(vols.filter(x => x !== v)) }, `${v.name} ✕`))) : null,
+    el("label", { class: "f" }, el("span", null, sorted.length ? "Someone not on the club list" : "Add a volunteer"),
+      el("div", { class: "row" }, other, el("button", { class: "btn quiet", style: "flex:0 0 auto", onclick: addOther }, "Add"))),
+    ev.publishedAt ? el("p", { class: "small muted" }, "Already published? Tap Publish again on the Results tab to update the page.") : null);
+}
+function addControl(ev, x, y) {
+  const cs = cloneCtrls(ev);
+  const n = cs.length ? Math.max(...cs.map(c => c.n)) + 1 : 1;
+  let code; do { code = rnd(3, CODECH); } while (cs.some(c => c.code === code));
+  cs.push({ n, pts: 10, code, x, y });
+  updateEvent(ev.id, { controls: cs });
+}
+
+/* ---------- printable control sheet ---------- */
+function sheetHtml(ev) {
+  const esc = s => String(s).replace(/[&<>"]/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[ch]));
+  const card = (big, sub, qr, code, foot) => `<section class="card"><div class="hd"><span class="fl"></span><span class="big">${big}</span><span class="sub">${sub}</span></div>
+    <div class="qr">${qr}</div><div class="code">${code}</div><div class="ft">${foot}</div></section>`;
+  const name = esc(ev.name), join = qrSvg(appLink()), logo = `<img class="lg" src="${LOGO}" alt="">`;
+  let body = "";
+  coursesOf(ev).forEach(c => body += card(logo + "Start", esc(c.name), qrSvg(P.start(ev, c)), `Can’t scan? Enter ${manualCode(ev, c)}`,
+    `${name}, ${esc(c.name)}. ${c.limitMin} minutes, ${ev.penaltyPerMin || 0} points off per minute late${+ev.bonus ? `, ${ev.bonus} bonus points for finishing in time` : ""}.` +
+    `<div class="join"><div class="jq">${join}</div><div>New here? Scan this small code to open the club app. Choose solo, pair or group, add your name, then scan the big code.</div></div>`));
+  [...ev.controls].sort((a, b) => a.n - b.n).forEach(c => body += card(String(c.n), `${c.pts} points`, qrSvg(P.control(ev, c)), `${c.n}-${c.code}`, name));
+  body += card("Finish", "", qrSvg(P.finish(ev)), "Or tap Finish in the app", name);
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${name} control sheet</title><style>
+  @page{size:A4;margin:10mm}body{margin:0;font-family:Arial,sans-serif;color:#111}
+  .card{height:135mm;border:1.5px dashed #999;padding:8mm;margin-bottom:6mm;display:flex;flex-direction:column;align-items:center;page-break-inside:avoid;break-inside:avoid}
+  .hd{display:flex;align-items:center;gap:6mm;width:100%}.fl{width:16mm;height:16mm;border:1px solid #111;background:linear-gradient(135deg,#fff 0 50%,#EC6C27 50% 100%);-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .big{font-size:20mm;font-weight:700;line-height:1}.sub{margin-left:auto;font-size:7mm;font-weight:700}.lg{width:22mm;height:22mm;vertical-align:middle;margin-right:4mm;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .qr{width:72mm;margin:4mm 0}.qr svg{width:100%;height:auto;display:block}.code{font-size:7mm;font-weight:700;letter-spacing:.05em}.ft{font-size:4mm;color:#444;margin-top:2mm;text-align:center}
+  .join{display:flex;gap:4mm;align-items:center;margin-top:3mm;text-align:left}.jq{width:24mm}.jq svg{width:100%;height:auto}
+  </style></head><body>${body}</body></html>`;
+}
+function downloadSheet(ev) {
+  if (typeof qrcode !== "function") { toast("The QR maker didn’t load. Open the app with signal and try again.", "badt"); return; }
+  saveFile(`${safeName(ev.name)}-controls.html`, sheetHtml(ev), "text/html");
+  toast("Sheet downloaded. Open it and print.", "good");
+}
+
+/* ---------- backup ---------- */
+const blobToDataUrl = b => new Promise(res => { const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(b); });
+async function exportBackup() {
+  const events = await IDB.all("events"), entries = await IDB.all("entries"), maps = {};
+  for (const ev of events) if (ev.hasMap) { const b = await IDB.get("maps", ev.id); if (b) maps[ev.id] = await blobToDataUrl(b); }
+  saveFile(`frome-orienteering-backup-${today()}.json`, JSON.stringify({ app: "frome-o", v: 1, events, entries, maps }), "application/json");
+  toast("Backup downloaded", "good");
+}
+async function importBackup(file) {
+  let j; try { j = JSON.parse(await file.text()); } catch (e) { toast("That file isn’t a backup from this app", "badt"); return; }
+  if (j.app !== "frome-o") { toast("That file isn’t a backup from this app", "badt"); return; }
+  if (!confirm(`Restore ${j.events.length} events and ${j.entries.length} results? Events with the same code on this device are replaced.`)) return;
+  try {
+    for (const ev of j.events) await IDB.put("events", ev);
+    for (const en of j.entries) await IDB.put("entries", en);
+    for (const [id, d] of Object.entries(j.maps || {})) await IDB.put("maps", await (await fetch(d)).blob(), id);
+  } catch (e) { failed(); return; }
+  S.mapUrls = {}; S.entriesFor = null; await loadEvents(); toast("Backup restored", "good"); render(true);
+}
+
+/* ---------- results ---------- */
+const statusOf = en => en.finish ? "fin" : en.retired ? "ret" : "out";
+function scoreEntry(en, ev) {
+  const byN = new Map((ev.controls || []).map(c => [c.n, c]));
+  const seen = new Set(); let pts = 0; const rows = [];
+  for (const p of en.punches || []) {
+    const c = byN.get(p.n);
+    const ok = !!c && !seen.has(p.n) && (en.source === "paper" || p.code === c.code);
+    if (ok) { seen.add(p.n); pts += +c.pts || 0; }
+    rows.push({ ...p, ok, pts: ok ? +c.pts || 0 : 0 });
+  }
+  const limit = courseOf(ev, en.course).limitMin;
+  const time = en.finish && en.start ? en.finish - en.start : null;
+  const over = time == null ? 0 : time - limit * 60000;
+  const pen = over > 0 ? Math.ceil(over / 60000) * (+ev.penaltyPerMin || 0) : 0;
+  const bonus = time != null && over <= 0 ? (+ev.bonus || 0) : 0; // flat bonus for finishing within the limit
+  return { pts, pen, bonus, total: pts + bonus - pen, time, rows, limit };
+}
+// finished entries for one course (and optionally one type), best first
+const ranked = (ev, courseId, type) => S.entries
+  .filter(en => statusOf(en) === "fin" && courseOf(ev, en.course).id === courseId && (!type || (en.type || "solo") === type))
+  .map(en => ({ en, s: scoreEntry(en, ev) }))
+  .sort((a, b) => (b.s.total - a.s.total) || (a.s.time - b.s.time));
+
+function entryFrom(ev, r, source) {
+  return { key: `${ev.id}/${r.runId}`, id: r.runId, eventId: ev.id, name: String(r.name || "Runner").slice(0, 60),
+    course: r.course || "c1", type: TYPES[r.type] ? r.type : "solo", size: +r.size || 1,
+    members: Array.isArray(r.members) ? r.members.map(x => x ? String(x) : null) : [],
+    start: +r.start, finish: r.finish ? +r.finish : null,
+    punches: (r.punches || []).map(p => ({ n: +p.n, code: String(p.code || "").toUpperCase(), t: +p.t })),
+    source, addedAt: Date.now() };
+}
+async function fetchSheet(ev, loud) {
+  if (!SHEET || S.fetching) return;
+  S.fetching = true;
+  try {
+    const j = await (await fetch(`${SHEET}?event=${encodeURIComponent(ev.id)}`)).json();
+    if (!j.ok) throw new Error("bad reply");
+    const all = (await IDB.all("entries")).filter(e => e.eventId === ev.id);
+    const have = new Map(all.map(e => [e.id, e]));
+    let finished = 0;
+    for (const r of j.results || []) {
+      if (!r.runId) continue;
+      const ex = have.get(r.runId), rFin = r.finish ? +r.finish : null;
+      if (ex && (ex.deleted || ex.source === "paper")) continue;
+      if (ex && !rFin && (ex.finish || ex.retired)) continue;   // don't undo a finish or a "back safe"
+      if (ex && ex.finish === rFin && (ex.punches || []).length === (r.punches || []).length) continue;
+      if (rFin && !(ex && ex.finish)) finished++;
+      const nu = entryFrom(ev, r, "phone");
+      if (ex && ex.renamed) Object.assign(nu, { name: ex.name, type: ex.type, size: ex.size, members: ex.members || [], renamed: true });
+      await IDB.put("entries", nu);
+    }
+    S.lastSync = Date.now(); S.syncErr = "";
+    if (S.entriesFor === ev.id) await loadEntries(ev.id);
+    if (finished) toast(`${finished} new result${finished > 1 ? "s" : ""}`, "good"); else if (loud) toast("Up to date", "good");
+  } catch (e) {
+    S.syncErr = "Couldn’t reach the results sheet. Check your signal.";
+    if (loud) toast(S.syncErr, "badt");
+  } finally { S.fetching = false; render(); }
+}
+setInterval(() => {
+  const ev = evById(S.resultsId);
+  if (view === "results" && ev && SHEET && document.visibilityState === "visible") fetchSheet(ev, false);
+}, 30000);
+setInterval(() => { if (view === "results") render(); }, 30000); // keeps "out for" times fresh
+
+function importScan(ev) {
+  openScanner("Scan a runner’s finish code", "", text => {
+    const p = P.parse(text);
+    if (!p || p.kind !== "R") { toast("That isn’t a finish code. Ask the runner to tap Finish first.", "badt"); return false; }
+    const [id, runId, nm, course, type, size, st, dur, ps, mem] = p.parts;
+    if (id !== ev.id) { toast(`That result is for event ${id.toUpperCase()}, not this one`, "badt"); return false; }
+    const start = +st * 1000;
+    const punches = (ps || "").split(",").filter(Boolean).map(s => { const [n, code, t] = s.split("."); return { n: +n, code, t: +t * 1000 }; });
+    const r = { runId, name: decodeURIComponent(nm), course, type, size, start, finish: start + +dur * 1000, punches,
+      members: mem ? mem.split(",").map(x => x || null) : [] };
+    IDB.put("entries", entryFrom(ev, r, "phone")).then(async () => { await loadEntries(ev.id); toast(`${r.name} downloaded`, "good"); render(); }).catch(failed);
+    return false; // stay open for the next runner
+  }, null);
+}
+function paperForm(ev, en) {
+  const f = $("#form"), picked = new Set((en?.punches || []).map(p => p.n));
+  const d = ev.date || today();
+  const name = el("input", { type: "text", value: en?.name || "", maxlength: 60, list: "memberNames" });
+  const course = el("select", null, coursesOf(ev).map(c => el("option", { value: c.id, selected: c.id === courseOf(ev, en?.course).id }, `${c.name} (${c.limitMin} min)`)));
+  const type = el("select", null, Object.entries(TYPES).map(([k, v]) => el("option", { value: k, selected: k === (en?.type || "solo") }, v)));
+  const size = el("input", { type: "number", min: 3, max: 30, inputmode: "numeric", value: String(en?.type === "group" ? en.size : 3) });
+  const sizeWrap = el("label", { class: "f", hidden: type.value !== "group" }, el("span", null, "Group size"), size);
+  type.addEventListener("change", () => { sizeWrap.hidden = type.value !== "group"; });
+  const st = el("input", { type: "time", step: 1, value: en?.start ? fmtClock(en.start) : fmtClock(Date.now()) });
+  const fn = el("input", { type: "time", step: 1, value: en?.finish ? fmtClock(en.finish) : "" });
+  const chips = [...(ev.controls || [])].sort((a, b) => a.n - b.n).map(c => el("button", { class: "chip", type: "button", "aria-pressed": String(picked.has(c.n)),
+    onclick: e => { picked.has(c.n) ? picked.delete(c.n) : picked.add(c.n); e.currentTarget.setAttribute("aria-pressed", String(picked.has(c.n))); } }, c.n));
+  const save = async () => {
+    if (!name.value.trim() || !st.value) { toast("Add a name and start time", "badt"); return; }
+    const start = new Date(`${d}T${st.value}`).getTime();
+    let finish = fn.value ? new Date(`${d}T${fn.value}`).getTime() : null;
+    if (finish && finish <= start) finish += 86400000;
+    const id = en?.id || "p" + Date.now(), t = type.value;
+    try {
+      await IDB.put("entries", { key: `${ev.id}/${id}`, id, eventId: ev.id, name: name.value.trim(), course: course.value,
+        members: t === "solo" && memberIdFor(name.value) ? [memberIdFor(name.value)] : [],
+        type: t, size: t === "solo" ? 1 : t === "pair" ? 2 : Math.max(3, Math.round(+size.value) || 3),
+        start, finish, retired: !!en?.retired && !finish, punches: [...picked].map(n => ({ n, code: null, t: null })), source: "paper", addedAt: Date.now() });
+    } catch (e) { failed(); return; }
+    f.hidden = true; await loadEntries(ev.id); toast(finish ? "Saved" : "Saved as still out", "good"); render(true);
+  };
+  f.replaceChildren(el("div", { class: "wrap" },
+    el("button", { class: "link", onclick: () => { f.hidden = true; } }, "Cancel"),
+    el("h1", null, en ? "Edit paper entry" : "Add paper entry"),
+    el("p", { class: "small muted" }, "Leave the finish time blank to log someone going out. They’ll show as still out until you add it."),
+    el("label", { class: "f" }, el("span", null, "Name, team name or everyone’s names"), name),
+    el("div", { class: "grid2" }, el("label", { class: "f" }, el("span", null, "Course"), course), el("label", { class: "f" }, el("span", null, "Running as"), type)),
+    sizeWrap,
+    el("div", { class: "grid2" }, el("label", { class: "f" }, el("span", null, "Start time"), st), el("label", { class: "f" }, el("span", null, "Finish time"), fn)),
+    el("h3", { style: "margin-top:14px" }, "Controls visited"),
+    chips.length ? el("div", { class: "chips" }, chips) : el("p", { class: "muted" }, "This event has no controls yet."),
+    el("div", { class: "sec" }, el("button", { class: "btn go big", onclick: save }, "Save entry"))));
+  f.hidden = false; name.focus();
+}
+function nameForm(ev, en) {
+  const f = $("#form");
+  const name = el("input", { type: "text", id: "fixName", value: en.name, maxlength: 60, list: "memberNames" });
+  const type = el("select", { id: "fixType" }, Object.entries(TYPES).map(([k, v]) => el("option", { value: k, selected: k === (en.type || "solo") }, v)));
+  const size = el("input", { type: "number", id: "fixSize", min: 3, max: 30, inputmode: "numeric", value: String(en.type === "group" ? en.size : 3) });
+  const sizeWrap = el("label", { class: "f", hidden: type.value !== "group" }, el("span", null, "Group size"), size);
+  type.addEventListener("change", () => { sizeWrap.hidden = type.value !== "group"; });
+  const save = async () => {
+    if (!name.value.trim()) { toast("Add a name", "badt"); return; }
+    const t = type.value;
+    try { await IDB.put("entries", { ...en, name: name.value.trim(), members: t === "solo" ? (memberIdFor(name.value) ? [memberIdFor(name.value)] : []) : (en.members || []), type: t, size: t === "solo" ? 1 : t === "pair" ? 2 : Math.max(3, Math.round(+size.value) || 3), renamed: true }); }
+    catch (e) { failed(); return; }
+    f.hidden = true; await loadEntries(ev.id);
+    toast(ev.publishedAt ? "Saved. Tap Publish again to update the results page." : "Saved", "good"); render(true);
+  };
+  f.replaceChildren(el("div", { class: "wrap" },
+    el("button", { class: "link", onclick: () => { f.hidden = true; } }, "Cancel"),
+    el("h1", null, "Edit name"),
+    el("p", { class: "small muted" }, "Fix a typo or match the name they’ve used at other events, so the season league counts them as one person. Their time and controls stay as they are."),
+    el("label", { class: "f" }, el("span", null, "Name, team name or everyone’s names"), name),
+    el("label", { class: "f" }, el("span", null, "Running as"), type), sizeWrap,
+    el("div", { class: "sec" }, el("button", { class: "btn go big", onclick: save }, "Save"))));
+  f.hidden = false; name.focus();
+}
+function exportCsv(ev) {
+  const q = s => `"${String(s).replace(/"/g, '""')}"`;
+  const lines = [["Course", "Position", "Name", "Running as", "People", "Time", "Points", "Bonus", "Penalty", "Total", "Controls", "Source"].join(",")];
+  for (const c of coursesOf(ev)) {
+    ranked(ev, c.id).forEach(({ en, s }, i) => lines.push([q(c.name), i + 1, q(en.name), typeLabel(en.type, en.size), en.size || 1, fmtDur(s.time),
+      s.pts, s.bonus, s.pen, s.total, q(s.rows.filter(r => r.ok).map(r => r.n).join(" ")), en.source].join(",")));
+    S.entries.filter(en => statusOf(en) !== "fin" && courseOf(ev, en.course).id === c.id).forEach(en =>
+      lines.push([q(c.name), statusOf(en) === "ret" ? "Retired" : "Still out", q(en.name), typeLabel(en.type, en.size), en.size || 1, "", "", "", "", "", "", en.source].join(",")));
+  }
+  saveFile(`${safeName(ev.name)}-results.csv`, lines.join("\n"), "text/csv");
+}
+async function deleteEntry(ev, en) {
+  if (!confirm(`Delete ${en.name}’s entry?`)) return;
+  // phone entries are kept as "deleted" so the sheet doesn't bring them back
+  if (en.source === "phone") await IDB.put("entries", { key: en.key, id: en.id, eventId: ev.id, deleted: true });
+  else await IDB.del("entries", en.key);
+  S.open = null; await loadEntries(ev.id); render(true);
+}
+async function markBack(ev, en) {
+  if (!confirm(`Mark ${en.name} as back safely without a result?`)) return;
+  await IDB.put("entries", { ...en, retired: true }); await loadEntries(ev.id); toast(`${en.name} marked as back`, "good"); render(true);
+}
+
+function stillOutPanel(ev) {
+  const out = S.entries.filter(en => statusOf(en) === "out").sort((a, b) => a.start - b.start);
+  if (!out.length) return el("p", { class: "ok", style: "margin:16px 0" }, S.entries.length ? "Everyone who started is back." : "");
+  const now = Date.now();
+  return el("div", { class: "out" },
+    el("h2", null, `${out.length} still out`),
+    el("ul", null, out.map(en => {
+      const c = courseOf(ev, en.course), gone = now - en.start, late = gone > c.limitMin * 60000;
+      return el("li", null,
+        el("span", { class: "nm" }, en.name, en.type !== "solo" ? el("span", { class: "small muted" }, ` (${typeLabel(en.type, en.size).toLowerCase()})`) : null,
+          el("div", { class: "small " + (late ? "bad" : "muted") }, `${c.name}, out ${Math.floor(gone / 60000)} min` + (late ? `, ${Math.floor((gone - c.limitMin * 60000) / 60000)} min over` : ""))),
+        en.source === "paper" ? el("button", { class: "btn quiet", onclick: () => paperForm(ev, en) }, "Add finish") : null,
+        el("button", { class: "btn quiet", onclick: () => markBack(ev, en) }, "Back safe"));
+    })),
+    el("p", { class: "small muted" }, "Phone runners appear here once their start reaches the sheet. Log paper runners with Add paper entry and a blank finish time."));
+}
+
+function renderResults() {
+  if (!S.events.length) return [el("h1", null, "Results"), el("p", { class: "muted" }, S.eventsLoaded ? "Create an event first." : "Loading…")];
+  if (!evById(S.resultsId)) S.resultsId = S.events[0].id;
+  const ev = evById(S.resultsId), courses = coursesOf(ev);
+  if (S.entriesFor !== ev.id) {
+    S.entriesFor = ev.id; S.entriesLoaded = false; S.entries = []; S.course = null;
+    loadEntries(ev.id).then(() => render()); fetchSheet(ev, false);
+  }
+  if (!courses.some(c => c.id === S.course)) S.course = courses[0].id;
+  const out = [el("h1", null, "Results"),
+    el("label", { class: "f" }, el("span", null, "Event"), el("select", { onchange: e => { S.resultsId = e.target.value; S.open = null; render(true); } },
+      S.events.map(e => el("option", { value: e.id, selected: e.id === ev.id }, `${e.name}, ${fmtDate(e.date)}`)))),
+    el("div", { class: "row" },
+      el("button", { class: "btn go", onclick: () => importScan(ev) }, "Scan finish codes"),
+      el("button", { class: "btn quiet", onclick: () => paperForm(ev) }, "Add paper entry"),
+      SHEET ? el("button", { class: "btn quiet", disabled: S.fetching, onclick: () => fetchSheet(ev, true) }, S.fetching ? "Checking…" : "Check for uploads") : null,
+      el("button", { class: "btn quiet", disabled: !S.entries.length, onclick: () => exportCsv(ev) }, "Export CSV")),
+    SHEET ? el("div", { class: "pub" },
+      el("div", null, el("b", null, ev.publishedAt ? "On the results page" : "Not on the results page yet"),
+        el("div", { class: "small muted" }, ev.publishedAt ? `Published ${fmtClock(ev.publishedAt).slice(0, 5)}, ${new Date(ev.publishedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}. Publish again after any changes.` : "Check the results, then publish them for everyone to see."),
+        el("div", { class: "small muted" }, `${(ev.volunteers || []).length} volunteer${(ev.volunteers || []).length === 1 ? "" : "s"} recorded. `,
+          el("button", { class: "link", style: "padding:0", onclick: () => { S.editing = ev.id; location.hash = "events"; } }, "Edit volunteers"))),
+      el("div", { class: "row", style: "flex:0 0 auto" },
+        el("button", { class: "btn go", disabled: S.publishing || (!S.entries.length && !(ev.volunteers || []).length), onclick: () => publishResults(ev) }, S.publishing ? "Publishing…" : ev.publishedAt ? "Publish again" : "Publish results"),
+        ev.publishedAt ? el("button", { class: "btn quiet", onclick: () => unpublishResults(ev) }, "Remove") : null)) : null,
+    SHEET && S.lastSync && !S.syncErr ? el("p", { class: "small muted" }, `Uploads checked at ${fmtClock(S.lastSync).slice(0, 5)}, then every 30 seconds.`) : null,
+    S.syncErr ? el("p", { class: "small bad" }, S.syncErr) : null];
+  if (!S.entriesLoaded) { out.push(el("p", { class: "muted" }, "Loading results…")); return out; }
+  out.push(stillOutPanel(ev));
+
+  // course and type filters
+  out.push(el("div", { class: "chips", role: "group", "aria-label": "Course" }, courses.map(c =>
+    el("button", { class: "chip", type: "button", style: "padding:0 14px", "aria-pressed": String(c.id === S.course), onclick: () => { S.course = c.id; S.open = null; render(true); } },
+      `${c.name} (${ranked(ev, c.id).length})`))));
+  out.push(el("div", { class: "chips", role: "group", "aria-label": "Running as" }, [["", "Everyone"], ...Object.entries(TYPES)].map(([k, v]) =>
+    el("button", { class: "chip", type: "button", style: "padding:0 14px;font-size:.95rem", "aria-pressed": String((S.rtype || "") === k), onclick: () => { S.rtype = k; S.open = null; render(true); } }, v))));
+
+  const c = courseOf(ev, S.course);
+  out.push(el("p", { class: "small muted" }, `${c.name}: ${c.limitMin} minute limit, ${ev.penaltyPerMin || 0} points off per minute or part minute late` + (+ev.bonus ? `, ${ev.bonus} bonus points for finishing in time.` : ".")));
+  const list = ranked(ev, c.id, S.rtype || null);
+  const retired = S.entries.filter(en => statusOf(en) === "ret" && courseOf(ev, en.course).id === c.id && (!S.rtype || (en.type || "solo") === S.rtype));
+  if (!list.length && !retired.length) {
+    out.push(el("p", { class: "muted", style: "margin-top:12px" }, SHEET ? "No finishers on this course yet. Results appear here as they upload, or scan finish codes and add paper entries."
+      : "No finishers on this course yet. Scan runners’ finish codes as they come in, or add paper entries."));
+    return out;
+  }
+  const row = (en, s, pos) => {
+    const isOpen = S.open === en.id;
+    return el("li", null,
+      el("button", { class: "line", "aria-expanded": String(isOpen), onclick: () => { S.open = isOpen ? null : en.id; render(true); } },
+        el("span", { class: "pos" }, typeof pos === "number" ? medal(pos) : pos),
+        el("span", null, el("span", { class: "name" }, en.name), " ",
+          el("span", { class: "tag" + (en.source === "paper" ? " p" : "") }, en.source === "paper" ? "Paper" : "Phone"),
+          (en.type || "solo") !== "solo" ? [" ", el("span", { class: "tag p" }, typeLabel(en.type, en.size))] : null,
+          el("div", { class: "small muted" }, s ? `${fmtDur(s.time)}, ${s.pts} pts` + (s.bonus ? `, +${s.bonus} on time` : "") + (s.pen ? `, −${s.pen} late` : "") : "Retired")),
+        el("span", { class: "tot" }, s ? s.total : "–")),
+      isOpen ? el("div", { class: "detail" },
+        s ? el("ol", { class: "splits" }, s.rows.map(r => el("li", { class: r.ok ? "" : "bad" },
+          `Control ${r.n}` + (r.t != null && !isNaN(r.t) ? ` at ${fmtDur(r.t)}` : "") + (r.ok ? `, ${r.pts} pts` : ", not counted")))) : null,
+        s && s.rows.some(r => !r.ok) ? el("p", { class: "small bad" }, "Red punches didn’t match a control code or were repeats.") : null,
+        el("div", { class: "row" },
+          el("button", { class: "btn quiet", onclick: () => en.source === "paper" ? paperForm(ev, en) : nameForm(ev, en) }, en.source === "paper" ? "Edit" : "Edit name"),
+          el("button", { class: "btn danger", onclick: () => deleteEntry(ev, en) }, "Delete"))) : null);
+  };
+  out.push(el("ul", { class: "res" }, list.map(({ en, s }) => row(en, s, list.findIndex(o => o.s.total === s.total && o.s.time === s.time) + 1)), retired.map(en => row(en, null, "–"))));
+  return out;
+}
+
+/* ---------- publishing results ---------- */
+const KEYKEY = "foc-pubkey";
+async function publishResults(ev) {
+  const key = String(ls.get(KEYKEY, "") || "").trim();
+  if (!key) { toast("Add your publishing password on the Events page first", "badt"); return; }
+  const rows = [];
+  for (const c of coursesOf(ev)) ranked(ev, c.id).forEach(({ en, s }, i) => rows.push({
+    course: c.id, pos: i + 1, name: en.name, type: en.type || "solo", size: en.size || 1,
+    time: s.time, pts: s.pts, bonus: s.bonus, pen: s.pen, total: s.total, controls: s.rows.filter(r => r.ok).length, members: en.members || [] }));
+  if (!rows.length && !(ev.volunteers || []).length) { toast("No finishers to publish yet", "badt"); return; }
+  if (!confirm(`Publish ${rows.length} result${rows.length > 1 ? "s" : ""} for ${ev.name} to the public results page? Anyone with the link can see them.`)) return;
+  S.publishing = true; render(true);
+  try {
+    const body = { action: "publish", key, event: { id: ev.id, name: ev.name, date: ev.date, penaltyPerMin: +ev.penaltyPerMin || 0, bonus: +ev.bonus || 0,
+      courses: coursesOf(ev).map(c => ({ id: c.id, name: c.name, limitMin: c.limitMin })),
+      volunteers: (ev.volunteers || []).map(v => ({ id: v.id || null, name: v.name })) }, rows };
+    const j = await (await fetch(SHEET, { method: "POST", body: JSON.stringify(body) })).json();
+    if (!j.ok) { toast(j.error === "wrong password" ? "The publishing password doesn’t match the one in your Google Sheet script" : j.error === "no password set" ? "Set PUBLISH_PASSWORD in your Google Sheet script first" : "The sheet refused that. Try again.", "badt"); }
+    else { await updateEvent(ev.id, { publishedAt: Date.now() }); S.live.at = 0; toast("Published to the results page", "good"); }
+  } catch (e) { toast("Couldn’t reach the sheet. Check your signal and try again.", "badt"); }
+  finally { S.publishing = false; render(true); }
+}
+async function unpublishResults(ev) {
+  const key = String(ls.get(KEYKEY, "") || "").trim();
+  if (!confirm(`Take ${ev.name} off the public results page?`)) return;
+  try {
+    const j = await (await fetch(SHEET, { method: "POST", body: JSON.stringify({ action: "unpublish", key, eventId: ev.id }) })).json();
+    if (!j.ok) { toast(j.error === "wrong password" ? "The publishing password doesn’t match" : "The sheet refused that. Try again.", "badt"); return; }
+    await updateEvent(ev.id, { publishedAt: null }); S.live.at = 0; toast("Taken off the results page");
+  } catch (e) { toast("Couldn’t reach the sheet. Check your signal and try again.", "badt"); }
+}
+
+/* ---------- public results page ---------- */
+const LIVEKEY = "foc-live";
+S.live = { events: ls.get(LIVEKEY, null)?.events || [], at: 0, loading: false, err: "", tab: "event", ev: null, course: null, type: "", year: null };
+async function fetchLive(force) {
+  const L = S.live;
+  if (!SHEET || L.loading || (!force && Date.now() - L.at < 60000)) return;
+  L.loading = true; render();
+  try {
+    const j = await (await fetch(`${SHEET}?published=1`)).json();
+    if (!j.ok) throw new Error("bad reply");
+    L.events = (j.events || []).sort((a, b) => (b.date || "").localeCompare(a.date || "") || (b.publishedAt || 0) - (a.publishedAt || 0));
+    L.at = Date.now(); L.err = ""; ls.set(LIVEKEY, { events: L.events });
+  } catch (e) { L.err = L.events.length ? "Showing the results saved on this phone. Couldn’t check for newer ones." : "Couldn’t load results. Check your signal and try again."; L.at = Date.now(); }
+  finally { L.loading = false; render(); }
+}
+setInterval(() => { if (view === "live" && document.visibilityState === "visible") fetchLive(); }, 60000);
+
+const ordinal = n => n + (n % 100 >= 11 && n % 100 <= 13 ? "th" : ["th", "st", "nd", "rd"][n % 10] || "th");
+const leagueKey = r => {
+  const ids = (r.members || []).filter(Boolean);
+  return ids.length ? `m:${[...ids].sort().join("+")}|${r.type || "solo"}` : `${String(r.name).trim().toLowerCase()}|${r.type || "solo"}`;
+};
+// a solo member's result shows their current list name, so a rename fixes past results too
+const shownName = r => ((r.type || "solo") === "solo" && (r.members || [])[0] && memberName(r.members[0])) || r.name;
+// Season standings after event e: every published event that year up to and including it.
+function seasonSoFar(events, e, courseName) {
+  const year = (e.date || "").slice(0, 4);
+  const upto = events.filter(x => (x.date || "").startsWith(year) &&
+    ((x.date || "") < (e.date || "") || ((x.date || "") === (e.date || "") && (x.publishedAt || 0) <= (e.publishedAt || 0))));
+  const m = new Map();
+  seasonLeague(upto, courseName, "").forEach((t, i, all) => {
+    const place = all.findIndex(o => o.points === t.points) + 1; // equal points share a place
+    m.set(t.key, { points: t.points, place });
+  });
+  return m;
+}
+// League points: the course winner gets 100, everyone else the same share of the winner's score.
+function leaguePoints(total, top) {
+  if (top > 0) return Math.max(0, Math.round(100 * total / top));
+  return total === top ? 100 : 0;
+}
+function seasonLeague(events, courseName, type) {
+  const table = new Map();
+  for (const e of events) {
+    const c = (e.courses || []).find(x => x.name === courseName); if (!c) continue;
+    const rows = (e.rows || []).filter(r => r.course === c.id); if (!rows.length) continue;
+    const top = Math.max(...rows.map(r => +r.total));
+    const here = new Map(); // one score per person per event: their best
+    for (const r of rows) {
+      if (type && (r.type || "solo") !== type) continue;
+      const k = leagueKey(r), lp = leaguePoints(+r.total, top);
+      if (!here.has(k) || here.get(k).lp < lp) here.set(k, { r, lp });
+    }
+    for (const [k, { r, lp }] of here) {
+      const t = table.get(k) || { key: k, name: shownName(r), type: r.type || "solo", size: r.size, points: 0, events: 0, best: 0 };
+      t.points += lp; t.events++; t.best = Math.max(t.best, lp); t.name = shownName(r); table.set(k, t);
+    }
+  }
+  return [...table.values()].sort((a, b) => b.points - a.points || b.events - a.events || a.name.localeCompare(b.name));
+}
+// All-time per person: events attended (any course) and points scored. Club members in a pair or
+// group each get the team's result; guests aren't counted. One result per person per event: their best.
+function personTotals(events) {
+  const t = new Map();
+  for (const e of events) {
+    const best = new Map();
+    for (const r of e.rows || []) {
+      const ids = (r.members || []).filter(Boolean);
+      const keys = ids.length ? ids.map(id => [`m:${id}`, memberName(id) || ((r.type || "solo") === "solo" ? r.name : null)])
+                              : [[`n:${String(r.name).trim().toLowerCase()}`, r.name]];
+      for (const [k, nm] of keys) if (nm && (!best.has(k) || best.get(k).total < +r.total)) best.set(k, { name: nm, total: +r.total, team: (r.type || "solo") !== "solo" && !ids.length ? r : null });
+    }
+    for (const [k, v] of best) {
+      const p = t.get(k) || { name: v.name, events: 0, score: 0, type: v.team ? v.team.type : null, size: v.team ? v.team.size : 1 };
+      p.events++; p.score += v.total; p.name = v.name; t.set(k, p);
+    }
+  }
+  return [...t.values()];
+}
+function volunteerTotals(events) {
+  const t = new Map();
+  for (const e of [...events].sort((a, b) => (a.date || "").localeCompare(b.date || ""))) {
+    const seen = new Set();
+    for (const v of e.volunteers || []) {
+      const k = v.id ? `m:${v.id}` : `n:${String(v.name).trim().toLowerCase()}`;
+      if (seen.has(k)) continue; seen.add(k);
+      const p = t.get(k) || { name: v.name, count: 0 };
+      p.count++; p.name = (v.id && memberName(v.id)) || v.name; p.last = `${e.name}, ${fmtDate(e.date)}`; t.set(k, p);
+    }
+  }
+  return [...t.values()].sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+}
+const MEDALS = { 1: ["#E9B53A", "#B8860B", "1st place"], 2: ["#C3CAD3", "#8A939E", "2nd place"], 3: ["#CD8A55", "#94582B", "3rd place"] };
+function medal(place) {
+  const m = MEDALS[place]; if (!m) return place;
+  const svg = `<svg viewBox="0 0 32 40" width="30" height="38" aria-hidden="true">
+    <path d="M9 0h6l4 14h-6z" fill="#332F53"/><path d="M23 0h-6l-4 14h6z" fill="#EC6C27"/>
+    <circle cx="16" cy="25" r="12" fill="${m[0]}" stroke="${m[1]}" stroke-width="2"/>
+    <circle cx="16" cy="25" r="8" fill="none" stroke="${m[1]}" stroke-width="1" opacity=".6"/>
+    <text x="16" y="29.5" text-anchor="middle" font-family="Fredoka,Nunito,sans-serif" font-weight="700" font-size="12" fill="#2B2747">${place}</text></svg>`;
+  return el("span", { class: "medal", role: "img", "aria-label": m[2], html: svg });
+}
+const chipRow = (label, items, cur, set) => el("div", { class: "chips", role: "group", "aria-label": label }, items.map(([k, v]) =>
+  el("button", { class: "chip", type: "button", style: "padding:0 14px;font-size:.95rem", "aria-pressed": String(cur === k), onclick: () => { set(k); render(true); } }, v)));
+
+function renderLive() {
+  const L = S.live;
+  if (!SHEET) return [el("h1", null, "Club results"), el("p", { class: "muted" }, "The results page isn’t switched on yet. The organiser turns it on by adding the Google Sheet link to the app.")];
+  if (!L.at && !L.loading) fetchLive(true);
+  const out = [el("div", { class: "row" }, el("h1", null, "Club results"),
+    el("button", { class: "btn quiet", style: "flex:0 0 auto", disabled: L.loading, onclick: () => fetchLive(true) }, L.loading ? "Loading…" : "Refresh")),
+    el("div", { class: "seg", role: "group", "aria-label": "Show", style: "margin:12px 0" },
+      [["event", "Events"], ["league", "League"], ["volunteers", "Volunteers"]].map(([k, v]) =>
+        el("button", { type: "button", "aria-pressed": String(L.tab === k), onclick: () => { L.tab = k; render(true); } }, v)))];
+  if (L.err) out.push(el("p", { class: "small bad" }, L.err));
+  if (!L.events.length) { out.push(el("p", { class: "muted" }, L.loading || !L.at ? "Loading results…" : "No results published yet. They appear here after each event.")); return out; }
+  const typeChips = chipRow("Running as", [["", "Everyone"], ...Object.entries(TYPES)], L.type, k => L.type = k);
+
+  if (L.tab === "event") {
+    const e = L.events.find(x => x.id === L.ev) || L.events[0]; L.ev = e.id;
+    const courses = e.courses || [];
+    if (!courses.some(c => c.id === L.course)) L.course = courses[0]?.id;
+    const c = courses.find(x => x.id === L.course);
+    const rows = (e.rows || []).filter(r => r.course === L.course && (!L.type || (r.type || "solo") === L.type)).sort((a, b) => a.pos - b.pos);
+    out.push(el("label", { class: "f" }, el("span", null, "Event"), el("select", { id: "liveEvent", onchange: ev => { L.ev = ev.target.value; render(true); } },
+      L.events.map(x => el("option", { value: x.id, selected: x.id === e.id }, `${x.name}, ${fmtDate(x.date)}`)))),
+      chipRow("Course", courses.map(x => [x.id, x.name]), L.course, k => L.course = k), typeChips,
+      c ? el("p", { class: "small muted" }, `${c.name}: ${c.limitMin} minute limit, ${e.penaltyPerMin || 0} points off per minute late` + (+e.bonus ? `, ${e.bonus} bonus points for finishing in time.` : ".")) : null);
+    const season = c ? seasonSoFar(L.events, e, c.name) : new Map();
+    if (!rows.length) out.push(el("p", { class: "muted" }, "No finishers here."));
+    else out.push(el("ol", { class: "board" }, rows.map((r, i) => el("li", null,
+      el("span", { class: "pos" }, medal(rows.findIndex(o => +o.total === +r.total && +o.time === +r.time) + 1)), // exact ties share a place
+      el("span", { class: "who" }, el("span", { class: "name" }, shownName(r)), (r.type || "solo") !== "solo" ? [" ", el("span", { class: "tag p" }, typeLabel(r.type, r.size))] : null,
+        el("span", { class: "small muted" }, `${fmtDur(r.time)}, ${r.pts} pts, ${r.controls} control${r.controls === 1 ? "" : "s"}` + (+r.bonus ? `, +${r.bonus} on time` : "") + (r.pen ? `, −${r.pen} late` : ""))),
+      el("span", { class: "tot" }, r.total,
+        season.get(leagueKey(r)) ? el("span", { class: "season" }, `Season ${season.get(leagueKey(r)).points}, ${ordinal(season.get(leagueKey(r)).place)}`) : null)))));
+    if ((e.volunteers || []).length) out.push(el("p", { class: "thanks" }, el("b", null, "Thanks to our volunteers: "),
+      joinNames(e.volunteers.map(v => (v.id && memberName(v.id)) || v.name))));
+    out.push(el("p", { class: "small muted" }, `Season shows each person’s league points and place for ${(e.date || "").slice(0, 4)} up to and including this event.`));
+    return out;
+  }
+
+  // league, all-time totals and volunteers share a period picker: a year, or all time
+  const years = [...new Set(L.events.map(x => (x.date || "").slice(0, 4)).filter(Boolean))].sort().reverse();
+  if (L.year !== "all" && !years.includes(L.year)) L.year = years[0];
+  const inPeriod = L.year === "all" ? L.events : L.events.filter(x => (x.date || "").startsWith(L.year));
+  const periodPick = el("label", { class: "f" }, el("span", null, L.tab === "league" ? "Season" : "Period"),
+    el("select", { id: "liveYear", onchange: ev => { L.year = ev.target.value; render(true); } },
+      years.map(y => el("option", { value: y, selected: y === L.year }, `${y} season`)),
+      el("option", { value: "all", selected: L.year === "all" }, "All time")));
+  const board = (items, line, big) => el("ol", { class: "board" }, items.map((t, i) => el("li", null,
+    el("span", { class: "pos" }, medal(t.place || i + 1)),
+    el("span", { class: "who" }, el("span", { class: "name" }, t.name), t.type && t.type !== "solo" ? [" ", el("span", { class: "tag p" }, typeLabel(t.type, t.size))] : null,
+      el("span", { class: "small muted" }, line(t))),
+    el("span", { class: "tot" }, big(t)))));
+  const placed = (list, val) => list.map((t, i) => ({ ...t, place: list.findIndex(o => val(o) === val(t)) + 1 })); // equal totals share a place
+  const plural = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
+
+  if (L.tab === "volunteers") {
+    const table = volunteerTotals(inPeriod);
+    out.push(periodPick, el("p", { class: "small muted" }, "Everyone who helped out: planning courses, putting out controls, running the start or finish, collecting in. Thank you."));
+    if (!table.length) out.push(el("p", { class: "muted" }, "No volunteers recorded yet."));
+    else out.push(board(placed(table, t => t.count), t => t.last ? `Last helped at ${t.last}` : "", t => el("span", null, t.count, el("span", { class: "season" }, t.count === 1 ? "event" : "events"))));
+    return out;
+  }
+
+  if (L.year === "all") {
+    if (!["events", "score"].includes(L.sort)) L.sort = "events";
+    const people = personTotals(L.events).sort((a, b) => L.sort === "events" ? (b.events - a.events || b.score - a.score) : (b.score - a.score || b.events - a.events));
+    out.push(periodPick,
+      chipRow("Sort by", [["events", "Most events"], ["score", "Most points"]], L.sort, k => L.sort = k),
+      el("p", { class: "small muted" }, `Every event since the club started using the app (${plural(L.events.length, "event")}), on any course. A pair or group result counts for each club member in it.`));
+    if (!people.length) out.push(el("p", { class: "muted" }, "No one yet."));
+    else out.push(board(placed(people, t => L.sort === "events" ? t.events : t.score),
+      t => L.sort === "events" ? `${t.score} points scored` : plural(t.events, "event"),
+      t => el("span", null, L.sort === "events" ? t.events : t.score, el("span", { class: "season" }, L.sort === "events" ? (t.events === 1 ? "event" : "events") : "points"))));
+    return out;
+  }
+
+  // one season's league, per course
+  const names = [...new Set(inPeriod.flatMap(x => (x.courses || []).map(c => c.name)))];
+  if (!names.includes(L.course)) L.course = names[0];
+  const table = seasonLeague(inPeriod, L.course, L.type);
+  out.push(periodPick, chipRow("Course", names.map(n => [n, n]), L.course, k => L.course = k), typeChips,
+    el("p", { class: "small muted" }, `${plural(inPeriod.length, "event")}${+L.year < new Date().getFullYear() ? "" : " so far"}. The course winner at each event gets 100 league points, and everyone else gets the same share of the winner’s score. For example, 150 points when the winner scored 200 earns 75.`));
+  if (!table.length) out.push(el("p", { class: "muted" }, "No one on this course yet."));
+  else {
+    const ranked = placed(table, t => t.points);
+    const over = +L.year < new Date().getFullYear();
+    if (over) out.push(el("div", { class: "podium" }, el("h2", null, `${L.year} ${L.course} champions`),
+      el("ol", null, ranked.filter(t => t.place <= 3).map(t => el("li", null, medal(t.place), el("span", { class: "name" }, t.name), el("span", { class: "small muted" }, `${t.points} pts`))))));
+    out.push(board(ranked, t => `${plural(t.events, "event")}, best ${t.best}`, t => t.points));
+  }
+  return out;
+}
+
+/* ---------- organiser sign-in ---------- */
+function renderUnlock() {
+  const pw = el("input", { type: "password", id: "orgPass", autocomplete: "current-password" });
+  const btn = el("button", { class: "btn go big", type: "submit" }, "Unlock organiser mode");
+  const go = async e => {
+    e.preventDefault();
+    const key = pw.value.trim(); if (!key) { pw.focus(); return; }
+    btn.disabled = true; btn.textContent = "Checking…";
+    try {
+      const j = await (await fetch(SHEET, { method: "POST", body: JSON.stringify({ action: "check", key }) })).json();
+      if (j.ok) {
+        ls.set("foc-org", true); ls.set(KEYKEY, key);
+        try { navigator.storage?.persist?.(); } catch (x) {}
+        route(); try { await loadEvents(); } catch (x) {}
+        render(true); toast("Organiser mode is on for this phone", "good"); return;
+      }
+      toast(j.error === "no password set" ? "Set PUBLISH_PASSWORD in your Google Sheet script first" : "That password isn’t right", "badt");
+    } catch (x) { toast("Couldn’t reach the sheet. You need signal to unlock organiser mode the first time.", "badt"); }
+    btn.disabled = false; btn.textContent = "Unlock organiser mode"; pw.select();
+  };
+  return [el("h1", null, "Organiser sign-in"),
+    el("p", { class: "muted" }, "Enter the club’s publishing password to use the organiser screens on this phone. You only need to do this once per phone, with signal."),
+    el("form", { onsubmit: go }, el("label", { class: "f" }, el("span", null, "Publishing password"), pw), btn),
+    el("p", { style: "margin-top:18px" }, el("a", { href: "#run", class: "link" }, "Back to the runner screen"))];
+}
+
+/* ---------- shell ---------- */
+function route() {
+  const h = location.hash.slice(1);
+  const wantsOrg = h === "events" || h === "results";
+  // Without a Google Sheet there's nothing to check a password against, so organiser mode stays open.
+  if (wantsOrg && !SHEET && !ls.get("foc-org", false)) { ls.set("foc-org", true); try { navigator.storage?.persist?.(); } catch (e) {} }
+  S.editor = !!ls.get("foc-org", false);
+  view = h === "results-live" ? "live" : wantsOrg && !S.editor ? "unlock"
+    : S.editor ? (["run", "events", "results"].includes(h) ? h : "events") : "run";
+  document.querySelectorAll("#nav [data-org]").forEach(a => a.hidden = !S.editor);
+  $("#liveLink").hidden = !SHEET;
+  $("#liveLink").textContent = S.editor ? "Public" : "Results";
+  document.querySelectorAll("#nav a").forEach(a => a.getAttribute("href") === "#" + (view === "live" ? "results-live" : view) ? a.setAttribute("aria-current", "page") : a.removeAttribute("aria-current"));
+}
+function fillMemberNames() {
+  const d = $("#memberNames"); if (d) d.replaceChildren(...[...S.members].sort((a, b) => a.name.localeCompare(b.name)).map(m => el("option", { value: m.name })));
+}
+function render(force) {
+  fillMemberNames();
+  const a = document.activeElement;
+  if (!force && a && app.contains(a) && a.matches("input,select,textarea")) { S.pending = true; return; }
+  S.pending = false;
+  const kids = view === "unlock" ? renderUnlock() : view === "events" ? renderEvents() : view === "results" ? renderResults() : view === "live" ? renderLive() : renderRun();
+  app.replaceChildren(...kids.flat(Infinity).filter(k => k != null && k !== false && k !== ""));
+}
+app.addEventListener("focusout", () => setTimeout(() => {
+  const a = document.activeElement;
+  if (S.pending && !(a && app.contains(a) && a.matches("input,select,textarea"))) render();
+}, 0));
+window.addEventListener("hashchange", () => { route(); render(true); scrollTo(0, 0); });
+
+(async function init() {
+  route(); render(true);
+  if (S.editor) { try { await loadEvents(); } catch (e) { toast("This browser blocked on-device storage", "badt"); } render(true); }
+  window.addEventListener("hashchange", async () => { if (S.editor && !S.eventsLoaded) { await loadEvents(); render(true); } });
+  sendOutbox(); sendJoin(); fetchMembers(true);
+  if ("serviceWorker" in navigator) navigator.serviceWorker.register("./sw.js").catch(() => {});
+})();
+</script>
+</body>
+</html>
