@@ -77,7 +77,7 @@ nav a[aria-current="page"]{opacity:1;box-shadow:inset 0 -3px 0 #EC6C27}
 :focus-visible{outline:3px solid var(--purple);outline-offset:2px}
 label.f{display:block;margin:10px 0}
 label.f span{display:block;font-size:.9rem;color:var(--muted);margin-bottom:4px}
-input[type=text],input[type=number],input[type=date],input[type=time],select{width:100%;padding:10px 12px;border:1.5px solid var(--line);border-radius:8px;background:var(--surface);min-height:44px}
+input[type=text],input[type=tel],input[type=number],input[type=date],input[type=time],select{width:100%;padding:10px 12px;border:1.5px solid var(--line);border-radius:8px;background:var(--surface);min-height:44px}
 input:focus{border-color:var(--purple);outline:none}
 .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 .row>*{flex:1 1 auto}
@@ -105,6 +105,7 @@ input:focus{border-color:var(--purple);outline:none}
 .map img{display:block;width:100%;height:auto;user-select:none;-webkit-user-drag:none}
 .map.placing{cursor:crosshair;outline:3px solid var(--orange);outline-offset:-3px}
 .pin{position:absolute;width:30px;height:30px;margin:-15px 0 0 -15px;border:3px solid #A1197F;border-radius:50%;pointer-events:none}
+.pin.sf{border-radius:0;border-width:0;width:0;height:0;margin:-12px 0 0 -12px;border-left:12px solid transparent;border-right:12px solid transparent;border-bottom:21px solid #A1197F}
 .pin b{position:absolute;left:24px;top:-14px;font:700 15px/1 var(--head);color:#A1197F;text-shadow:0 0 3px #fff,0 0 3px #fff}
 .ctl{display:grid;grid-template-columns:72px 84px 1fr auto;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line)}
 .ctl .code{font-family:var(--head);font-weight:600;letter-spacing:.04em}
@@ -170,6 +171,18 @@ details.mem{margin-top:16px} details.mem summary{cursor:pointer;font-weight:700;
 .podium h2{font-size:1.2rem;margin-bottom:6px}
 .podium ol{list-style:none;margin:0;padding:0;display:grid;gap:6px}
 .podium li{display:flex;align-items:center;gap:10px}.podium .name{font-weight:700;flex:1;min-width:0}
+.finhint{padding:12px 14px;border-radius:12px;background:var(--surface);border:1.5px solid var(--line)}
+.finhint .link{color:var(--muted);font-weight:600}
+.sos-btn{margin-top:22px;background:var(--surface);border:2px solid var(--danger);color:var(--danger)}
+.sos-call{display:block;text-align:center;text-decoration:none;background:var(--danger);border-color:var(--danger);color:#fff;margin:14px 0}
+.sos a.btn{display:block;text-align:center;text-decoration:none;color:var(--ink)}
+.sos a.btn.go{color:var(--orange-ink)}
+.sos a.sos-call{color:#fff}
+.sos{padding-bottom:80px}
+.sosbox{padding:12px 14px;border-radius:12px;background:var(--surface);border:1.5px solid var(--line);margin:10px 0}
+.sosbox .lbl{font-size:.8rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.sosbox .gr{font-family:var(--head);font-weight:600;font-size:2rem;letter-spacing:.03em;font-variant-numeric:tabular-nums}
+.sosmsg{white-space:pre-wrap;font:inherit;font-size:.9rem;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:10px;margin:8px 0}
 @media (prefers-reduced-motion:reduce){.toast{transition:none}}
 @media (max-width:460px){.ctl{grid-template-columns:60px 70px 1fr auto}.grid2{grid-template-columns:1fr}}
 </style>
@@ -290,7 +303,7 @@ const typeLabel = (t, n) => t === "group" ? `Group of ${n || "?"}` : TYPES[t] ||
 
 /* ---------- QR payloads ---------- */
 const P = {
-  start: (ev, c) => `FOC2|S|${ev.id}|${encodeURIComponent(ev.name || "")}|${c.id}|${encodeURIComponent(c.name || "")}|${c.limitMin || 0}`,
+  start: (ev, c) => `FOC2|S|${ev.id}|${encodeURIComponent(ev.name || "")}|${c.id}|${encodeURIComponent(c.name || "")}|${c.limitMin || 0}|${(ev.orgPhone || "").replace(/[^\d+]/g, "")}`,
   control: (ev, c) => `FOC2|C|${ev.id}|${c.n}|${c.code}`,
   finish: ev => `FOC2|F|${ev.id}`,
   result: r => `FOC2|R|${r.eventId}|${r.runId}|${encodeURIComponent(r.name)}|${r.course || ""}|${r.type || "solo"}|${r.size || 1}|` +
@@ -312,7 +325,7 @@ function runnerSize(t) {
   return Math.max(3, Math.min(30, v || 3));
 }
 
-function beginRun(eventId, eventName, courseId, courseName, limitMin) {
+function beginRun(eventId, eventName, courseId, courseName, limitMin, orgPhone) {
   const who = whoIsRunning();
   if (who.err) { toast(who.err, "badt"); return false; }
   const { name, type, size, members } = who;
@@ -321,16 +334,25 @@ function beginRun(eventId, eventName, courseId, courseName, limitMin) {
   courseId = courseId || "c1";
   run = { runId: `${Math.round(Date.now() / 1000)}-${rnd(4, LETTERS)}`, eventId, eventName: eventName || `Event ${eventId.toUpperCase()}`,
     course: courseId, courseName: courseName || `Course ${courseId.slice(1)}`, limitMin: +limitMin || 0,
+    orgPhone: String(orgPhone || "").replace(/[^\d+]/g, "").slice(0, 16),
     name, type, size, members, start: Date.now(), finish: null, punches: [], startSent: false, uploaded: false, warned5: false, warned0: false };
   saveRun(run);
   if (SHEET) queueResult(run); // tells the organiser you're out on the course
+  askLocationEarly();
   toast("Clock started. Good luck!", "good"); render(true); return true;
 }
 function addPunch(n, code) {
-  if (!run || run.finish) return false;
+  if (!run || run.finish || run.retired) return false;
   if (run.punches.some(p => p.n === n)) { toast(`You already punched ${n}`, "badt"); return false; }
   run.punches.push({ n, code: code.toUpperCase(), t: Date.now() - run.start });
   saveRun(run); toast(`Control ${n} punched`, "good"); render(true); return true;
+}
+function retireRun() {
+  if (!run || run.finish || run.retired) return;
+  if (!confirm("Retire and end your run without a result? Your time and controls won’t count.")) return;
+  run.retired = true; run.retiredAt = Date.now(); saveRun(run); toast("Run ended");
+  if (SHEET) queueResult(run);
+  render(true);
 }
 function finishRun() {
   if (!run || run.finish) return;
@@ -361,7 +383,7 @@ function alertRunner(msg, pattern, times) {
 
 /* ---------- runner: auto-upload with retry ---------- */
 const resultBody = r => ({ runId: r.runId, eventId: r.eventId, name: r.name, course: r.course, courseName: r.courseName,
-  type: r.type, size: r.size, members: r.members || [], start: r.start, finish: r.finish || null, punches: r.finish ? r.punches : [] });
+  type: r.type, size: r.size, members: r.members || [], start: r.start, finish: r.finish || null, retired: !r.finish && !!r.retired, punches: r.finish ? r.punches : [] });
 function queueResult(r) { ls.set(OUTKEY, ls.get(OUTKEY, []).filter(x => x.runId !== r.runId).concat([resultBody(r)])); sendOutbox(); }
 let sending = false;
 async function sendOutbox() {
@@ -372,8 +394,8 @@ async function sendOutbox() {
       const j = await (await fetch(SHEET, { method: "POST", body: JSON.stringify(r) })).json();
       if (j.ok) {
         // only clear this exact message: a finish queued while the start was sending must still go
-        ls.set(OUTKEY, ls.get(OUTKEY, []).filter(x => !(x.runId === r.runId && x.finish === r.finish)));
-        if (run && run.runId === r.runId) { if (r.finish) run.uploaded = true; else run.startSent = true; saveRun(run); }
+        ls.set(OUTKEY, ls.get(OUTKEY, []).filter(x => !(x.runId === r.runId && x.finish === r.finish && !!x.retired === !!r.retired)));
+        if (run && run.runId === r.runId) { if (r.finish || r.retired) run.uploaded = true; else run.startSent = true; saveRun(run); }
       }
     } catch (e) { /* no signal: try again later */ }
   }
@@ -492,6 +514,89 @@ function membersSection() {
         el("button", { class: "btn quiet", onclick: () => { if (confirm(`Remove ${m.name} from the list? Their past results stay.`)) saveMembers(S.members.filter(x => x.id !== m.id)); } }, "Remove")))) : null);
 }
 
+/* ---------- SOS ---------- */
+// WGS84 latitude/longitude to an OS grid reference (OSGB36, Helmert transform then Transverse Mercator).
+function osGridRef(lat, lon, digits = 8) {
+  const rad = Math.PI / 180;
+  const toXYZ = (φ, λ, a, b) => { const e2 = 1 - b * b / (a * a), ν = a / Math.sqrt(1 - e2 * Math.sin(φ) ** 2);
+    return [ν * Math.cos(φ) * Math.cos(λ), ν * Math.cos(φ) * Math.sin(λ), ν * (1 - e2) * Math.sin(φ)]; };
+  const [x1, y1, z1] = toXYZ(lat * rad, lon * rad, 6378137, 6356752.3142);
+  const s = -20.4894e-6, rx = -0.1502 / 3600 * rad, ry = -0.2470 / 3600 * rad, rz = -0.8421 / 3600 * rad;
+  const x = -446.448 + (1 + s) * x1 - rz * y1 + ry * z1, y = 125.157 + rz * x1 + (1 + s) * y1 - rx * z1, z = -542.060 - ry * x1 + rx * y1 + (1 + s) * z1;
+  const a = 6377563.396, b = 6356256.909, e2 = 1 - b * b / (a * a), p = Math.sqrt(x * x + y * y);
+  let φ = Math.atan2(z, p * (1 - e2)), φp = 2 * Math.PI;
+  while (Math.abs(φ - φp) > 1e-12) { const ν = a / Math.sqrt(1 - e2 * Math.sin(φ) ** 2); φp = φ; φ = Math.atan2(z + e2 * ν * Math.sin(φ), p); }
+  const λ = Math.atan2(y, x);
+  const F0 = 0.9996012717, φ0 = 49 * rad, λ0 = -2 * rad, N0 = -100000, E0 = 400000, n = (a - b) / (a + b);
+  const sinφ = Math.sin(φ), cosφ = Math.cos(φ), ν = a * F0 / Math.sqrt(1 - e2 * sinφ * sinφ), ρ = a * F0 * (1 - e2) / Math.pow(1 - e2 * sinφ * sinφ, 1.5), η2 = ν / ρ - 1;
+  const Ma = (1 + n + 5 / 4 * n * n + 5 / 4 * n ** 3) * (φ - φ0), Mb = (3 * n + 3 * n * n + 21 / 8 * n ** 3) * Math.sin(φ - φ0) * Math.cos(φ + φ0);
+  const Mc = (15 / 8 * n * n + 15 / 8 * n ** 3) * Math.sin(2 * (φ - φ0)) * Math.cos(2 * (φ + φ0)), Md = 35 / 24 * n ** 3 * Math.sin(3 * (φ - φ0)) * Math.cos(3 * (φ + φ0));
+  const M = b * F0 * (Ma - Mb + Mc - Md), tan2 = Math.tan(φ) ** 2, dλ = λ - λ0;
+  const I = M + N0, II = ν / 2 * sinφ * cosφ, III = ν / 24 * sinφ * cosφ ** 3 * (5 - tan2 + 9 * η2), IIIA = ν / 720 * sinφ * cosφ ** 5 * (61 - 58 * tan2 + tan2 * tan2);
+  const IV = ν * cosφ, V = ν / 6 * cosφ ** 3 * (ν / ρ - tan2), VI = ν / 120 * cosφ ** 5 * (5 - 18 * tan2 + tan2 * tan2 + 14 * η2 - 58 * tan2 * η2);
+  const N = I + II * dλ ** 2 + III * dλ ** 4 + IIIA * dλ ** 6, E = E0 + IV * dλ + V * dλ ** 3 + VI * dλ ** 5;
+  if (!(E >= 0 && E < 700000 && N >= 0 && N < 1300000)) return null; // outside Great Britain
+  const e100k = Math.floor(E / 100000), n100k = Math.floor(N / 100000);
+  let l1 = (19 - n100k) - (19 - n100k) % 5 + Math.floor((e100k + 10) / 5), l2 = (19 - n100k) * 5 % 25 + e100k % 5;
+  if (l1 > 7) l1++; if (l2 > 7) l2++;
+  const half = digits / 2, f = Math.pow(10, 5 - half);
+  const pad5 = v => String(Math.floor((v % 100000) / f)).padStart(half, "0");
+  return `${String.fromCharCode(l1 + 65, l2 + 65)} ${pad5(E)} ${pad5(N)}`;
+}
+
+let sosWatch = null;
+S.sos = { pos: null, err: "" };
+function askLocationEarly() { // so the permission prompt appears at the start, not in an emergency
+  try { navigator.geolocation?.getCurrentPosition(p => { S.sos.pos = p; }, () => {}, { enableHighAccuracy: true, timeout: 20000, maximumAge: 60000 }); } catch (e) {}
+}
+function sosMessage() {
+  const pos = S.sos.pos, last = run.punches[run.punches.length - 1];
+  const lines = [`SOS – Frome Orienteering. ${run.name} needs help.`, `${run.courseName}, started ${fmtClock(run.start).slice(0, 5)}.`];
+  if (pos) {
+    const { latitude: la, longitude: lo, accuracy } = pos.coords, gr = osGridRef(la, lo);
+    lines.push(`Location: ${gr ? gr + " " : ""}(±${Math.round(accuracy)} m), ${la.toFixed(5)}, ${lo.toFixed(5)}`, `Map: https://maps.google.com/?q=${la.toFixed(5)},${lo.toFixed(5)}`);
+  } else lines.push("Location: not available on my phone.");
+  lines.push(last ? `Last control: ${last.n} at ${fmtClock(run.start + last.t).slice(0, 5)}.` : "No controls punched yet.");
+  return lines.join("\n");
+}
+const isApple = () => /iP(hone|ad|od)|Macintosh/.test(navigator.userAgent) && "ontouchend" in document;
+const smsHref = (to, body) => `sms:${to || ""}${isApple() ? "&" : "?"}body=${encodeURIComponent(body)}`;
+function closeSos() { if (sosWatch != null) try { navigator.geolocation.clearWatch(sosWatch); } catch (e) {} sosWatch = null; $("#form").hidden = true; }
+function openSos() {
+  const f = $("#form"); f.hidden = false;
+  if (sosWatch == null && navigator.geolocation) {
+    try { sosWatch = navigator.geolocation.watchPosition(p => { S.sos.pos = p; S.sos.err = ""; drawSos(); },
+      e => { S.sos.err = e.code === 1 ? "Location is switched off for this site. Allow it in your phone’s settings, or describe where you are." : "Still finding your location…"; drawSos(); },
+      { enableHighAccuracy: true, timeout: 30000, maximumAge: 0 }); } catch (e) {}
+  }
+  drawSos();
+}
+function drawSos() {
+  const f = $("#form"); if (f.hidden || !run) return;
+  const pos = S.sos.pos, last = run.punches[run.punches.length - 1], msg = sosMessage();
+  let where;
+  if (pos) {
+    const { latitude: la, longitude: lo, accuracy } = pos.coords, gr = osGridRef(la, lo);
+    where = [el("div", { class: "gr" }, gr || `${la.toFixed(5)}, ${lo.toFixed(5)}`),
+      el("div", { class: "small" }, `Accurate to about ${Math.round(accuracy)} m` + (gr ? ` · ${la.toFixed(5)}, ${lo.toFixed(5)}` : "") + `. Updates while this screen is open.`)];
+  } else where = el("div", null, S.sos.err || "Finding your location… This can take up to a minute without signal.");
+  const copy = el("button", { class: "btn quiet", onclick: async () => {
+    try { await navigator.clipboard.writeText(msg); toast("Message copied", "good"); } catch (e) { toast("Couldn’t copy. Read it out instead.", "badt"); }
+  } }, "Copy message");
+  f.replaceChildren(el("div", { class: "wrap sos" },
+    el("div", { class: "row" }, el("h1", null, "Emergency"), el("button", { class: "btn quiet", style: "flex:0 0 auto", onclick: closeSos }, "Close")),
+    el("p", null, el("b", null, "If someone is badly hurt or in danger, call 999 first."), " Ask for Ambulance, and say you’re orienteering in the countryside."),
+    el("a", { class: "btn sos-call big", href: "tel:999" }, "Call 999"),
+    el("div", { class: "sosbox" }, el("div", { class: "lbl" }, "Your location"), where),
+    el("div", { class: "sosbox" }, el("div", { class: "lbl" }, "Last control"),
+      el("div", null, last ? `Control ${last.n} at ${fmtClock(run.start + last.t).slice(0, 5)} (${fmtDur(Date.now() - run.start - last.t).replace(/:\d\d$/, "")} min ago)` : `None yet. Started at ${fmtClock(run.start).slice(0, 5)}.`)),
+    el("a", { class: "btn go big", href: smsHref(run.orgPhone, msg) }, run.orgPhone ? "Text the organiser" : "Text for help"),
+    el("p", { class: "small muted" }, run.orgPhone ? "Opens your messages with all of this filled in. Just tap Send." : "Opens your messages with all of this filled in. Choose who to send it to, then tap Send."),
+    run.orgPhone ? el("a", { class: "btn quiet big", href: `tel:${run.orgPhone}`, style: "margin-top:8px" }, "Call the organiser") : null,
+    el("details", { class: "mem" }, el("summary", null, "See the message"), el("pre", { class: "sosmsg" }, msg), copy),
+    el("p", { class: "small muted", style: "margin-top:16px" }, "No signal? A 999 call can use any network. Six long blasts on a whistle is the distress signal.")));
+}
+
 /* ---------- runner screens ---------- */
 function startScan() {
   unlockAudio();
@@ -501,8 +606,8 @@ function startScan() {
   openScanner("Scan the start code for your course", "Start code, e.g. ABCD-1-60", text => {
     const p = P.parse(text);
     if (!p || p.kind !== "S") { toast("That isn’t a start code", "badt"); return false; }
-    const [id, enc, cid, cenc, lim] = p.parts;
-    return beginRun(id, decodeURIComponent(enc || ""), cid, decodeURIComponent(cenc || ""), lim);
+    const [id, enc, cid, cenc, lim, ph] = p.parts;
+    return beginRun(id, decodeURIComponent(enc || ""), cid, decodeURIComponent(cenc || ""), lim, ph);
   }, typed => {
     const m = typed.trim().match(/^([a-z]{4})\s*-\s*(\d+)\s*-\s*(\d+)$/i);
     return m ? `FOC2|S|${m[1].toLowerCase()}||c${m[2]}||${m[3]}` : null;
@@ -510,7 +615,7 @@ function startScan() {
 }
 function controlScan() {
   unlockAudio();
-  openScanner("Scan a control", "Control code, e.g. 14-K7X", text => {
+  openScanner("Scan a control or the finish", "Code under the QR, e.g. 14-K7X", text => {
     const p = P.parse(text);
     if (!p) { toast("That isn’t a control code", "badt"); return false; }
     if (p.parts[0] !== run.eventId) { toast("That code is for a different event", "badt"); return false; }
@@ -518,6 +623,8 @@ function controlScan() {
     if (p.kind !== "C") { toast("That isn’t a control code", "badt"); return false; }
     return addPunch(+p.parts[1], p.parts[2]);
   }, typed => {
+    const f = typed.trim().match(/^([a-z]{4})\W*F$/i);
+    if (f) return `FOC2|F|${f[1].toLowerCase()}`;
     const m = typed.trim().match(/^(\d+)\W*([A-Z0-9]{3})$/i);
     return m ? `FOC2|C|${run.eventId}|${m[1]}|${m[2].toUpperCase()}` : null;
   });
@@ -543,6 +650,10 @@ function renderRun() {
       installed() ? null : el("p", { class: "small muted" }, "Tip: add this page to your home screen before you head out, so it opens without signal.")];
   }
 
+  if (run.retired) return [el("h1", null, "Run ended"),
+    el("p", { class: "muted" }, `You retired from ${run.courseName} after ${fmtDur(run.retiredAt - run.start)}, with no result.`),
+    el("p", { class: "status" + (run.uploaded || !SHEET ? "" : "") }, SHEET ? (run.uploaded ? "The organiser has been told you’re back." : "Telling the organiser you’re back as soon as you have signal. Please check in with them too.") : "Please tell the organiser you’re back."),
+    el("div", { class: "sec" }, el("button", { class: "btn quiet big", onclick: () => { run = null; saveRun(null); render(true); } }, "Start a new run"))];
   if (!run.finish) {
     const out = [el("div", { class: "who" }, el("h2", null, run.name),
         el("span", { class: "muted small" }, run.courseName + (run.type !== "solo" ? `, ${typeLabel(run.type, run.size).toLowerCase()}` : ""))),
@@ -555,7 +666,10 @@ function renderRun() {
         run.punches.length ? el("ul", { class: "punches" }, [...run.punches].reverse().map(p =>
           el("li", null, el("span", { class: "ring" }, p.n), el("span", { class: "muted small" }, `at ${fmtClock(run.start + p.t)}`), el("span", { class: "t" }, fmtDur(p.t)))))
         : el("p", { class: "muted" }, "Punched controls appear here.")),
-      el("div", { class: "sec" }, el("button", { class: "btn big", onclick: () => { if (confirm("Finish now and stop the clock?")) finishRun(); } }, "Finish"))];
+      el("div", { class: "sec finhint" }, el("p", null, el("b", null, "To finish: "), "scan the Finish card at the finish with ",
+          el("b", null, "Scan control"), ". Your clock keeps running until you do."),
+        el("button", { class: "link small", onclick: retireRun }, "Retire (give up without a result)")),
+      el("button", { class: "btn sos-btn big", onclick: openSos }, "SOS / Emergency")];
     setTimeout(updateClock, 0);
     return out;
   }
@@ -581,7 +695,7 @@ function renderRun() {
     SHEET ? el("p", { style: "text-align:center" }, el("a", { href: "#results-live", class: "link" }, "Club results appear here once the organiser publishes them")) : null];
 }
 function updateClock() {
-  if (!run || run.finish) return;
+  if (!run || run.finish || run.retired) return;
   const c = $("#clock"); if (c) c.textContent = fmtDur(Date.now() - run.start);
   if (!run.limitMin) return;
   const left = run.limitMin * 60000 - (Date.now() - run.start);
@@ -746,7 +860,9 @@ function renderEdit(ev) {
     el("div", { class: "panel" }, field("Event name", "name", "text"),
       el("div", { class: "grid2" }, field("Date", "date", "date"),
         field("Penalty per minute late (points)", "penaltyPerMin", "number", { min: 0, inputmode: "numeric" }),
-        field("Bonus for finishing in time (points, 0 for none)", "bonus", "number", { min: 0, inputmode: "numeric" }))));
+        field("Bonus for finishing in time (points, 0 for none)", "bonus", "number", { min: 0, inputmode: "numeric" })),
+      field("Organiser mobile for SOS texts (optional)", "orgPhone", "tel", { placeholder: "07700 900123", autocomplete: "tel" }),
+      el("p", { class: "small muted" }, "Runners’ SOS button texts and calls this number. It’s carried in the start QR codes, so download the control sheet again after changing it.")));
 
   // courses
   const courses = coursesOf(ev);
@@ -778,14 +894,27 @@ function renderEdit(ev) {
   if (url) {
     const img = el("img", { src: url, alt: "Event map", draggable: false });
     const pins = ctrls.filter(c => c.x != null).map(c => el("span", { class: "pin", style: `left:${c.x * 100}%;top:${c.y * 100}%` }, el("b", null, c.n)));
+    if (ev.sf) pins.push(el("span", { class: "pin sf", style: `left:${ev.sf.x * 100}%;top:${ev.sf.y * 100}%` }, el("b", null, "S/F")));
     const map = el("div", { class: "map" + (S.placing ? " placing" : ""), onclick: e => {
       if (!S.placing) return;
       const r = img.getBoundingClientRect(), x = (e.clientX - r.left) / r.width, y = (e.clientY - r.top) / r.height;
-      if (x >= 0 && x <= 1 && y >= 0 && y <= 1) addControl(ev, Math.round(x * 1000) / 1000, Math.round(y * 1000) / 1000);
+      if (!(x >= 0 && x <= 1 && y >= 0 && y <= 1)) return;
+      const X = Math.round(x * 1000) / 1000, Y = Math.round(y * 1000) / 1000;
+      if (S.placing === "sf") { S.placing = false; updateEvent(ev.id, { sf: { x: X, y: Y } }); toast("Start and finish placed", "good"); }
+      else addControl(ev, X, Y);
     } }, img, pins);
-    mapSec.append(el("p", { class: "small muted" }, S.placing ? "Tap the map to drop a control. Tap Done when you’ve placed them all." : "Turn on placing to add controls by tapping the map."),
-      el("button", { class: "btn " + (S.placing ? "go" : "quiet"), onclick: () => { S.placing = !S.placing; render(true); } }, S.placing ? "Done placing" : "Place controls on map"),
-      el("div", { style: "margin-top:10px" }, map));
+    mapSec.append(el("p", { class: "small muted" }, S.placing === "sf" ? "Tap the map where the start and finish are." : S.placing ? "Tap the map to drop a control. Tap Done when you’ve placed them all." : "Turn on placing to add controls by tapping the map."),
+      el("div", { class: "row" },
+        el("button", { class: "btn " + (S.placing === true ? "go" : "quiet"), onclick: () => { S.placing = S.placing === true ? false : true; render(true); } }, S.placing === true ? "Done placing" : "Place controls on map"),
+        el("button", { class: "btn " + (S.placing === "sf" ? "go" : "quiet"), onclick: () => { S.placing = S.placing === "sf" ? false : "sf"; render(true); } }, S.placing === "sf" ? "Cancel" : ev.sf ? "Move start & finish" : "Place start & finish")),
+      el("div", { style: "margin-top:10px" }, map),
+      el("h3", { style: "margin-top:18px" }, "Map details for printing"),
+      el("p", { class: "small muted" }, "From your map’s export settings. With the scale and resolution, the printed map gets an accurate scale bar, and prints at its true scale if it fits on A4."),
+      el("div", { class: "grid2" },
+        field("Map scale (1:…)", "mapScale", "number", { min: 500, inputmode: "numeric", placeholder: "5000" }),
+        field("Export resolution (dpi)", "mapDpi", "number", { min: 50, inputmode: "numeric", placeholder: "300" }),
+        field("Contour interval (m)", "contour", "number", { min: 0, step: "0.5", inputmode: "decimal", placeholder: "5" })),
+      el("button", { class: "btn go", style: "margin-top:6px", onclick: () => downloadMap(ev) }, "Download printable map"));
   } else if (!ev.hasMap) {
     mapSec.append(el("p", { class: "small muted" }, "Export your map from OpenOrienteering Mapper or OCAD as a PNG or JPG and upload it here. Controls you place show as purple circles."));
   }
@@ -875,7 +1004,7 @@ function sheetHtml(ev) {
     `${name}, ${esc(c.name)}. ${c.limitMin} minutes, ${ev.penaltyPerMin || 0} points off per minute late${+ev.bonus ? `, ${ev.bonus} bonus points for finishing in time` : ""}.` +
     `<div class="join"><div class="jq">${join}</div><div>New here? Scan this small code to open the club app. Choose solo, pair or group, add your name, then scan the big code.</div></div>`));
   [...ev.controls].sort((a, b) => a.n - b.n).forEach(c => body += card(String(c.n), `${c.pts} points`, qrSvg(P.control(ev, c)), `${c.n}-${c.code}`, name));
-  body += card("Finish", "", qrSvg(P.finish(ev)), "Or tap Finish in the app", name);
+  body += card("Finish", "", qrSvg(P.finish(ev)), `Can’t scan? Enter ${ev.id.toUpperCase()}-F`, `${name}. Scan this to stop your clock.`);
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${name} control sheet</title><style>
   @page{size:A4;margin:10mm}body{margin:0;font-family:Arial,sans-serif;color:#111}
   .card{height:135mm;border:1.5px dashed #999;padding:8mm;margin-bottom:6mm;display:flex;flex-direction:column;align-items:center;page-break-inside:avoid;break-inside:avoid}
@@ -889,6 +1018,113 @@ function downloadSheet(ev) {
   if (typeof qrcode !== "function") { toast("The QR maker didn’t load. Open the app with signal and try again.", "badt"); return; }
   saveFile(`${safeName(ev.name)}-controls.html`, sheetHtml(ev), "text/html");
   toast("Sheet downloaded. Open it and print.", "good");
+}
+
+/* ---------- printable score map ---------- */
+const blobToDataUrlP = b => new Promise(res => { const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(b); });
+const imgSize = src => new Promise((res, rej) => { const i = new Image(); i.onload = () => res([i.naturalWidth, i.naturalHeight]); i.onerror = rej; i.src = src; });
+const niceBar = m => [10, 20, 25, 50, 100, 200, 250, 500, 1000, 2000].filter(v => v <= m).pop() || 10;
+
+async function mapHtml(ev) {
+  const blob = await IDB.get("maps", ev.id); if (!blob) throw new Error("no map");
+  const src = await blobToDataUrlP(blob), [pw, ph] = await imgSize(src);
+  const esc = s => String(s ?? "").replace(/[&<>"]/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[ch]));
+  const landscape = pw > ph, pageW = landscape ? 297 : 210, pageH = landscape ? 210 : 297, margin = 8;
+  const boxW = pageW - 2 * margin, boxH = pageH - 2 * margin - 24 - (landscape ? 30 : 46); // room for header and key
+  const scale = +ev.mapScale || 0, dpi = +ev.mapDpi || 0;
+  // Ground size of the map, known only when the export scale and resolution are given.
+  const groundW = scale && dpi ? pw / dpi * 0.0254 * scale : 0;            // metres
+  const nativeW = dpi ? pw / dpi * 25.4 : 0;                                  // mm at the drawn scale
+  let W = Math.min(boxW, boxH * pw / ph);
+  let exact = false;
+  if (nativeW && nativeW <= W) { W = nativeW; exact = true; }                // fits: print at the true scale
+  const H = W * ph / pw;
+  const printScale = groundW ? Math.round(groundW * 1000 / W) : 0;
+  const scaleText = printScale ? `Scale 1:${(exact ? scale : printScale).toLocaleString("en-GB")}` + (exact || !scale ? "" : ` (reduced from 1:${scale.toLocaleString("en-GB")} to fit A4)`)
+    : scale ? `Map drawn at 1:${scale.toLocaleString("en-GB")}` : "";
+
+  // Overprint in ISOM purple, sized in mm on paper.
+  const P = "#A626A4", r = 3, lw = 0.35;
+  const ctrls = (ev.controls || []).filter(c => c.x != null);
+  let over = "";
+  if (ev.sf) {
+    const x = ev.sf.x * W, y = ev.sf.y * H, s = 7, h = s * Math.sqrt(3) / 2;
+    over += `<polygon points="${x},${y - h * 2 / 3} ${x - s / 2},${y + h / 3} ${x + s / 2},${y + h / 3}" fill="none" stroke="${P}" stroke-width="${lw}"/>
+      <circle cx="${x}" cy="${y}" r="5" fill="none" stroke="${P}" stroke-width="${lw}"/><circle cx="${x}" cy="${y}" r="6.5" fill="none" stroke="${P}" stroke-width="${lw}"/>`;
+  }
+  for (const c of ctrls) {
+    const x = c.x * W, y = c.y * H;
+    over += `<circle cx="${x}" cy="${y}" r="${r}" fill="none" stroke="${P}" stroke-width="${lw}"/>
+      <text x="${x + r + 0.8}" y="${y - r + 0.6}" font-size="4.2" font-weight="700" fill="${P}" stroke="#fff" stroke-width="0.9" paint-order="stroke">${c.n}</text>
+      <text x="${x + r + 0.8}" y="${y - r + 3.6}" font-size="2.4" font-weight="700" fill="${P}" stroke="#fff" stroke-width="0.6" paint-order="stroke">${c.pts}pts</text>`;
+  }
+  // Scale bar about a quarter of the map's width, drawn in mm on paper.
+  let bar = "";
+  if (groundW) {
+    const mPerMm = groundW / W, len = niceBar(mPerMm * W / 4), mm = len / mPerMm, seg = mm / 2;
+    bar = `<svg class="bar" width="${mm + 14}mm" height="9mm" viewBox="0 0 ${mm + 14} 9">
+      <rect x="1" y="1.5" width="${seg}" height="1.6" fill="#2B2747"/><rect x="${1 + seg}" y="1.5" width="${seg}" height="1.6" fill="#fff" stroke="#2B2747" stroke-width="0.25"/>
+      <rect x="1" y="1.5" width="${mm}" height="1.6" fill="none" stroke="#2B2747" stroke-width="0.25"/>
+      <text x="1" y="7" font-size="2.8">0</text><text x="${1 + seg}" y="7" font-size="2.8" text-anchor="middle">${len / 2}</text><text x="${1 + mm}" y="7" font-size="2.8" text-anchor="middle">${len} m</text></svg>`;
+  }
+  const north = `<svg width="9mm" height="13mm" viewBox="0 0 9 13" aria-label="North"><text x="4.5" y="3.2" font-size="3.4" font-weight="700" text-anchor="middle">N</text>
+    <polygon points="4.5,4 7.5,12.5 4.5,10.5" fill="#2B2747"/><polygon points="4.5,4 1.5,12.5 4.5,10.5" fill="none" stroke="#2B2747" stroke-width="0.4"/></svg>`;
+  const contour = `<svg class="ct" viewBox="0 0 120 24" preserveAspectRatio="none" aria-hidden="true"><g fill="none" stroke="#A9CDA9" stroke-width="0.9">
+    ${[4, 10, 16, 22].map(y => `<path d="M0 ${y}c12-5 18 5 30 0s18-5 30 0 18 5 30 0 18-5 30 0"/>`).join("")}</g></svg>`;
+  const courses = coursesOf(ev).map(c => `${esc(c.name)}: ${c.limitMin} min`).join(" · ");
+  const rules = [`${ev.penaltyPerMin || 0} pts off per minute late`, +ev.bonus ? `${ev.bonus} pts bonus for finishing in time` : ""].filter(Boolean).join(" · ");
+  const table = [...(ev.controls || [])].sort((a, b) => a.n - b.n).map(c => `<span><b>${c.n}</b> ${c.pts}</span>`).join("");
+  const total = (ev.controls || []).reduce((a, c) => a + (+c.pts || 0), 0);
+  const key = [scaleText, ev.contour ? `Contours ${esc(ev.contour)} m` : "", "Map north up"].filter(Boolean).join(" · ");
+
+  return `<!DOCTYPE html><html lang="en-GB"><head><meta charset="utf-8"><title>${esc(ev.name)} map</title>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@600&family=Nunito:wght@400;700&display=swap" rel="stylesheet">
+<style>
+@page{size:A4 ${landscape ? "landscape" : "portrait"};margin:${margin}mm}
+*{box-sizing:border-box}body{margin:0;font-family:Nunito,Arial,sans-serif;color:#2B2747;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.page{width:${boxW}mm;margin:0 auto}
+.hd{position:relative;display:flex;align-items:center;gap:4mm;height:22mm;padding:0 4mm;border-radius:3mm;background:#FBF6EB;overflow:hidden;margin-bottom:2mm}
+.hd .ct{position:absolute;left:44%;top:0;width:30%;height:100%;opacity:.55}
+.hd img{width:18mm;height:18mm;position:relative}
+.hd .t{position:relative;flex:1;min-width:0}
+.hd h1{font-family:Fredoka,Nunito,sans-serif;font-weight:600;font-size:7mm;line-height:1;margin:0 0 1mm}
+.hd .s{font-size:3.2mm}
+.hd .c{position:relative;text-align:right;font-size:3mm;line-height:1.35;background:#FBF6EB;padding:1.5mm 0 1.5mm 3mm;border-radius:2mm}
+.hd .c b{color:#D95D1C}
+.mapw{position:relative;width:${W}mm;height:${H}mm;margin:0 auto;outline:0.45mm solid #2B2747}
+.mapw img{position:absolute;inset:0;width:100%;height:100%}
+.mapw svg.o{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.mapw svg.o text{font-family:Arial,sans-serif}
+.key{display:grid;grid-template-columns:${landscape ? "1fr auto auto" : "1fr auto"};gap:2mm 5mm;align-items:start;margin-top:2.5mm;font-size:3mm}
+.key h2{font-family:Fredoka,Nunito,sans-serif;font-weight:600;font-size:3.8mm;margin:0 0 1mm}
+.pts{display:flex;flex-wrap:wrap;gap:0.8mm 3mm}.pts span{white-space:nowrap}.pts b{color:#A626A4}
+.leg{display:flex;align-items:center;gap:3mm;flex-wrap:wrap;margin-top:1.5mm}
+.sym{display:inline-flex;align-items:center;gap:1mm}
+.side{display:flex;gap:3mm;align-items:center}
+.qr{width:20mm;text-align:center;font-size:2.4mm}.qr svg{width:20mm;height:20mm;display:block}
+.sos{margin-top:1mm;font-weight:700}
+.bar text{font-family:Arial,sans-serif;fill:#2B2747}
+</style></head><body><div class="page">
+<div class="hd">${contour}<img src="${LOGO}" alt="">
+  <div class="t"><h1>${esc(ev.name)}</h1><div class="s">${esc(fmtDate(ev.date))} · Score event · Frome Orienteering Club</div></div>
+  <div class="c"><b>${courses}</b><br>${rules}<br>Visit controls in any order</div></div>
+<div class="mapw"><img src="${src}" alt="Map"><svg class="o" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">${over}</svg></div>
+<div class="key">
+  <div><h2>Controls (number and points, ${total} points in total)</h2><div class="pts">${table}</div>
+    <div class="leg">
+      <span class="sym"><svg width="6mm" height="6mm" viewBox="0 0 8 8"><polygon points="4,0.6 7.4,6.8 0.6,6.8" fill="none" stroke="${P}" stroke-width="0.5"/></svg>Start</span>
+      <span class="sym"><svg width="6mm" height="6mm" viewBox="0 0 8 8"><circle cx="4" cy="4" r="2.6" fill="none" stroke="${P}" stroke-width="0.5"/></svg>Control</span>
+      <span class="sym"><svg width="6mm" height="6mm" viewBox="0 0 8 8"><circle cx="4" cy="4" r="2.2" fill="none" stroke="${P}" stroke-width="0.45"/><circle cx="4" cy="4" r="3.4" fill="none" stroke="${P}" stroke-width="0.45"/></svg>Finish</span>
+      <span>${key}</span></div>
+    <div class="sos">Emergency: call 999${ev.orgPhone ? ` · Organiser ${esc(ev.orgPhone)}` : ""} · SOS button in the app</div></div>
+  <div class="side">${north}${bar}</div>
+  <div class="qr">${qrSvg(appLink()) || ""}Scan for the app</div>
+</div></div></body></html>`;
+}
+async function downloadMap(ev) {
+  if (typeof qrcode !== "function") { toast("The QR maker didn’t load. Open the app with signal and try again.", "badt"); return; }
+  try { saveFile(`${safeName(ev.name)}-map.html`, await mapHtml(ev), "text/html"); toast("Map downloaded. Open it and print on A4.", "good"); }
+  catch (e) { toast("Couldn’t make the map. Try uploading it again.", "badt"); }
 }
 
 /* ---------- backup ---------- */
@@ -939,7 +1175,7 @@ function entryFrom(ev, r, source) {
   return { key: `${ev.id}/${r.runId}`, id: r.runId, eventId: ev.id, name: String(r.name || "Runner").slice(0, 60),
     course: r.course || "c1", type: TYPES[r.type] ? r.type : "solo", size: +r.size || 1,
     members: Array.isArray(r.members) ? r.members.map(x => x ? String(x) : null) : [],
-    start: +r.start, finish: r.finish ? +r.finish : null,
+    start: +r.start, finish: r.finish ? +r.finish : null, retired: !r.finish && !!r.retired,
     punches: (r.punches || []).map(p => ({ n: +p.n, code: String(p.code || "").toUpperCase(), t: +p.t })),
     source, addedAt: Date.now() };
 }
@@ -957,7 +1193,7 @@ async function fetchSheet(ev, loud) {
       const ex = have.get(r.runId), rFin = r.finish ? +r.finish : null;
       if (ex && (ex.deleted || ex.source === "paper")) continue;
       if (ex && !rFin && (ex.finish || ex.retired)) continue;   // don't undo a finish or a "back safe"
-      if (ex && ex.finish === rFin && (ex.punches || []).length === (r.punches || []).length) continue;
+      if (ex && ex.finish === rFin && !!ex.retired === (!rFin && !!r.retired) && (ex.punches || []).length === (r.punches || []).length) continue;
       if (rFin && !(ex && ex.finish)) finished++;
       const nu = entryFrom(ev, r, "phone");
       if (ex && ex.renamed) Object.assign(nu, { name: ex.name, type: ex.type, size: ex.size, members: ex.members || [], renamed: true });
@@ -1437,14 +1673,14 @@ function fillMemberNames() {
 function render(force) {
   fillMemberNames();
   const a = document.activeElement;
-  if (!force && a && app.contains(a) && a.matches("input,select,textarea")) { S.pending = true; return; }
+  if (!force && a && app.contains(a) && a.matches("input:not([type=file]),select,textarea")) { S.pending = true; return; }
   S.pending = false;
   const kids = view === "unlock" ? renderUnlock() : view === "events" ? renderEvents() : view === "results" ? renderResults() : view === "live" ? renderLive() : renderRun();
   app.replaceChildren(...kids.flat(Infinity).filter(k => k != null && k !== false && k !== ""));
 }
 app.addEventListener("focusout", () => setTimeout(() => {
   const a = document.activeElement;
-  if (S.pending && !(a && app.contains(a) && a.matches("input,select,textarea"))) render();
+  if (S.pending && !(a && app.contains(a) && a.matches("input:not([type=file]),select,textarea"))) render();
 }, 0));
 window.addEventListener("hashchange", () => { route(); render(true); scrollTo(0, 0); });
 
