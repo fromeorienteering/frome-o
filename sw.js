@@ -1,5 +1,5 @@
 // Keeps the app working offline. Change the version number when you update the app.
-const CACHE = "frome-o-v2";
+const CACHE = "frome-o-v5";
 const SHELL = ["./", "./index.html", "./manifest.webmanifest", "./icon-192.png", "./icon-512.png", "./apple-touch-icon.png"];
 
 self.addEventListener("install", e => {
