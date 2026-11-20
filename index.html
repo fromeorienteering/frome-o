@@ -21,7 +21,7 @@
    (it ends in /exec). Leave it empty to turn auto-upload off;
    scanning finish codes still works either way. */
 const CONFIG = {
-  sheetUrl: "https://script.google.com/macros/s/AKfycbzoYPAkwFUbs5IOqA8iI1Xr87EX_-HwIOjXI6ka4dfKvDgyrLpNDFpwphFY8GS1wFCDYw/exec"
+  sheetUrl: "https://script.google.com/macros/s/AKfycbwqtw-nt-MbqF4zlH2az3cHKM_-Qj7-66WwmxmQ69QchW-IXc386joGiciMVMdXW1XU/exec"
 };
 </script>
 <style>
@@ -183,6 +183,28 @@ details.mem{margin-top:16px} details.mem summary{cursor:pointer;font-weight:700;
 .sosbox .lbl{font-size:.8rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
 .sosbox .gr{font-family:var(--head);font-weight:600;font-size:2rem;letter-spacing:.03em;font-variant-numeric:tabular-nums}
 .sosmsg{white-space:pre-wrap;font:inherit;font-size:.9rem;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:10px;margin:8px 0}
+.cmps{display:inline-flex;gap:2px;align-items:center;color:var(--muted);vertical-align:middle}
+.cmps.pick{display:flex;gap:6px;margin:6px 0}
+.cmps.pick button{background:none;border:0;padding:4px;border-radius:50%;cursor:pointer;color:var(--muted)}
+.cmp svg{display:block}
+.cmp .r{stroke:var(--muted);opacity:.5}.cmp .a,.cmp .b{fill:none;stroke:var(--muted);opacity:.5}
+.cmp.on .r{stroke:var(--purple);opacity:1}.cmp.on .a{fill:var(--orange);stroke:var(--orange);opacity:1}.cmp.on .b{fill:var(--purple);stroke:var(--purple);opacity:1}
+.rate{margin:16px 0;padding:14px 16px;border-radius:16px;background:var(--surface);border:1.5px solid var(--line)}
+.rate.done{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.rate.done p{margin:0}
+.fbsum{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:8px 0}
+.fbsum .big{font-family:var(--head);font-weight:600;font-size:2.2rem;line-height:1}
+.dist{display:grid;gap:4px;max-width:360px;margin:8px 0}
+.dist>div{display:grid;grid-template-columns:16px 1fr 28px;gap:8px;align-items:center;font-size:.9rem;font-variant-numeric:tabular-nums}
+.barw{height:8px;border-radius:4px;background:var(--line);overflow:hidden}.bar{display:block;height:100%;background:var(--orange)}
+.fbl{list-style:none;margin:8px 0;padding:0}.fbl li{padding:10px 0;border-bottom:1px solid var(--line)}.fbl p{margin:4px 0 0}
+.fbh{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:8px 0}
+.stat{padding:10px 6px;border-radius:12px;background:var(--surface);border:1.5px solid var(--line);text-align:center;min-width:0}
+.stat b{display:block;font-family:var(--head);font-weight:600;font-size:1.6rem;line-height:1.1}
+.stat span{font-size:.8rem;color:var(--muted)}
+.medrow{display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin:6px 0}.medrow>span{display:inline-flex;align-items:center;gap:6px;font-weight:700}
+.seg button{font-size:1rem}
+@media (max-width:420px){.seg button{font-size:.9rem;padding:0 2px}}
 @media (prefers-reduced-motion:reduce){.toast{transition:none}}
 @media (max-width:460px){.ctl{grid-template-columns:60px 70px 1fr auto}.grid2{grid-template-columns:1fr}}
 </style>
@@ -686,6 +708,7 @@ function renderRun() {
     el("div", { class: "clockbox" }, el("div", { class: "clock" }, fmtDur(run.finish - run.start)),
       el("div", { class: "remain" }, `${run.punches.length} controls punched`)),
     status,
+    rateBlock(),
     svg ? el("div", { class: "qrbox", html: svg, role: "img", "aria-label": "Your result code" }) : el("p", { class: "bad" }, "The code couldn’t be drawn. Read your controls to the organiser instead."),
     el("ul", { class: "punches" }, run.punches.map(p => el("li", null, el("span", { class: "ring" }, p.n), el("span", { class: "t" }, fmtDur(p.t))))),
     el("div", { class: "sec" }, el("button", { class: "btn quiet big", onclick: () => {
@@ -763,9 +786,11 @@ $("#manualIn").addEventListener("keydown", e => { if (e.key === "Enter") useManu
 /* ---------- organiser: events ---------- */
 const failed = () => toast("That didn’t save. The device may be out of storage.", "badt");
 async function updateEvent(id, patch) {
-  const ev = evById(id); if (!ev) return;
-  Object.assign(ev, patch);
-  try { await IDB.put("events", ev); } catch (e) { failed(); }
+  if (!evById(id)) return;
+  // start from the latest saved copy, so a sync that landed meanwhile (e.g. the map's Drive file) isn't lost
+  const ev = Object.assign((await IDB.get("events", id)) || evById(id), patch);
+  Object.assign(evById(id), ev);
+  try { await saveEv(ev); } catch (e) { failed(); }
   await loadEvents(); render();
 }
 const cloneCtrls = ev => (ev.controls || []).map(c => ({ ...c }));
@@ -777,7 +802,7 @@ async function createEvent(form) {
     penaltyPerMin: Math.max(0, +form.pen.value || 0), bonus: Math.max(0, +form.bonus.value || 0),
     courses: [{ id: "c1", name: "2.5 km", limitMin: 60 }, { id: "c2", name: "5 km", limitMin: 60 }],
     controls: [], hasMap: false, createdAt: Date.now() };
-  try { await IDB.put("events", ev); } catch (e) { failed(); return; }
+  try { await saveEv(ev); } catch (e) { failed(); return; }
   await loadEvents(); S.newOpen = false; S.editing = id; render(true); toast("Event created. Set your course time limits next.", "good");
 }
 
@@ -785,7 +810,7 @@ function renderEvents() {
   if (S.editing && evById(S.editing)) return renderEdit(evById(S.editing));
   S.editing = null;
   const out = [el("div", { class: "row" }, el("h1", null, "Events"),
-    el("button", { class: "btn go", style: "flex:0 0 auto", onclick: () => { S.newOpen = !S.newOpen; render(true); } }, S.newOpen ? "Cancel" : "New event"))];
+    el("button", { class: "btn go", style: "flex:0 0 auto", onclick: () => { S.newOpen = !S.newOpen; render(true); } }, S.newOpen ? "Cancel" : "New event")), syncNote()];
   if (S.newOpen) {
     const f = el("form", { class: "panel", onsubmit: e => { e.preventDefault(); createEvent(f); } },
       el("h2", null, "New score event"),
@@ -825,14 +850,14 @@ function renderEvents() {
   if (SHEET) { fetchMembers(); out.push(membersSection()); }
   const fi = el("input", { type: "file", accept: "application/json,.json", hidden: true, onchange: e => { const f = e.target.files[0]; if (f) importBackup(f); e.target.value = ""; } });
   out.push(el("div", { class: "sec" }, el("h2", null, "Backup"),
-    el("p", { class: "small muted" }, "Events, maps and results are saved on this device only. Download a backup after each event, and restore it on a new phone or laptop."),
+    el("p", { class: "small muted" }, SHEET ? "Everything syncs through your Google Sheet, so a backup isn’t essential, but it’s a handy extra copy now and then." : "Events, maps and results are saved on this device only. Download a backup after each event, and restore it on a new phone or laptop."),
     el("div", { class: "row" }, el("button", { class: "btn quiet", onclick: exportBackup }, "Download backup"),
       el("button", { class: "btn quiet", onclick: () => fi.click() }, "Restore backup"), fi)));
   if (SHEET) out.push(el("div", { class: "sec" }, el("h2", null, "Lock this phone"),
     el("p", { class: "small muted" }, "Turns organiser mode off here, for example on a borrowed phone. Events and results stay saved, and come back when you sign in again with the password."),
     el("button", { class: "btn quiet", onclick: () => {
       if (!confirm("Lock organiser mode on this phone? You’ll need the password to get back in.")) return;
-      ls.set("foc-org", false); ls.set(KEYKEY, null); S.editing = null; location.hash = "run"; route(); render(true); toast("Organiser mode locked");
+      ls.set("foc-org", false); ls.set(KEYKEY, null); S.sync = { state: "", at: 0 }; S.editing = null; location.hash = "run"; route(); render(true); toast("Organiser mode locked");
     } }, "Lock organiser mode")));
   return out;
 }
@@ -850,7 +875,7 @@ function getMapUrl(ev) {
 }
 
 function renderEdit(ev) {
-  const out = [el("button", { class: "link", onclick: () => { S.editing = null; S.placing = false; render(true); } }, "Back to events")];
+  const out = [el("button", { class: "link", onclick: () => { S.editing = null; S.placing = false; render(true); } }, "Back to events"), syncNote()];
   const field = (label, key, type, attrs = {}) => el("label", { class: "f" }, el("span", null, label),
     el("input", { type, value: String(ev[key] ?? ""), ...attrs, onchange: e => {
       let v = e.target.value; if (type === "number") v = Math.max(0, +v || 0);
@@ -920,7 +945,7 @@ function renderEdit(ev) {
   }
   const fi = el("input", { type: "file", accept: "image/png,image/jpeg,image/webp", hidden: true, onchange: async e => {
     const f = e.target.files[0]; if (!f) return;
-    try { await IDB.put("maps", f, ev.id); } catch (err) { failed(); return; }
+    try { await IDB.put("maps", f, ev.id); queue("map", ev.id); } catch (err) { failed(); return; }
     if (S.mapUrls[ev.id]) { URL.revokeObjectURL(S.mapUrls[ev.id]); delete S.mapUrls[ev.id]; }
     await updateEvent(ev.id, { hasMap: true }); toast("Map added", "good");
   } });
@@ -956,7 +981,7 @@ function renderEdit(ev) {
     el("button", { class: "btn danger", onclick: async () => {
       if (!confirm(`Delete ${ev.name} and all its results? This can’t be undone.`)) return;
       for (const en of (await IDB.all("entries")).filter(x => x.eventId === ev.id)) await IDB.del("entries", en.key);
-      await IDB.del("maps", ev.id); await IDB.del("events", ev.id);
+      await IDB.del("maps", ev.id); await IDB.del("events", ev.id); queueDelEvent(ev.id);
       S.editing = null; await loadEvents(); toast("Event deleted"); render(true);
     } }, "Delete event")));
   return out;
@@ -1140,9 +1165,9 @@ async function importBackup(file) {
   if (j.app !== "frome-o") { toast("That file isn’t a backup from this app", "badt"); return; }
   if (!confirm(`Restore ${j.events.length} events and ${j.entries.length} results? Events with the same code on this device are replaced.`)) return;
   try {
-    for (const ev of j.events) await IDB.put("events", ev);
-    for (const en of j.entries) await IDB.put("entries", en);
-    for (const [id, d] of Object.entries(j.maps || {})) await IDB.put("maps", await (await fetch(d)).blob(), id);
+    for (const ev of j.events) { delete ev.mapFile; await saveEv(ev); }
+    for (const en of j.entries) await saveEn(en);
+    for (const [id, d] of Object.entries(j.maps || {})) { await IDB.put("maps", await (await fetch(d)).blob(), id); queue("map", id); }
   } catch (e) { failed(); return; }
   S.mapUrls = {}; S.entriesFor = null; await loadEvents(); toast("Backup restored", "good"); render(true);
 }
@@ -1197,6 +1222,7 @@ async function fetchSheet(ev, loud) {
       if (rFin && !(ex && ex.finish)) finished++;
       const nu = entryFrom(ev, r, "phone");
       if (ex && ex.renamed) Object.assign(nu, { name: ex.name, type: ex.type, size: ex.size, members: ex.members || [], renamed: true });
+      nu.updatedAt = (ex && ex.updatedAt) || 0;
       await IDB.put("entries", nu);
     }
     S.lastSync = Date.now(); S.syncErr = "";
@@ -1223,7 +1249,7 @@ function importScan(ev) {
     const punches = (ps || "").split(",").filter(Boolean).map(s => { const [n, code, t] = s.split("."); return { n: +n, code, t: +t * 1000 }; });
     const r = { runId, name: decodeURIComponent(nm), course, type, size, start, finish: start + +dur * 1000, punches,
       members: mem ? mem.split(",").map(x => x || null) : [] };
-    IDB.put("entries", entryFrom(ev, r, "phone")).then(async () => { await loadEntries(ev.id); toast(`${r.name} downloaded`, "good"); render(); }).catch(failed);
+    saveEn(entryFrom(ev, r, "phone")).then(async () => { await loadEntries(ev.id); toast(`${r.name} downloaded`, "good"); render(); }).catch(failed);
     return false; // stay open for the next runner
   }, null);
 }
@@ -1247,7 +1273,7 @@ function paperForm(ev, en) {
     if (finish && finish <= start) finish += 86400000;
     const id = en?.id || "p" + Date.now(), t = type.value;
     try {
-      await IDB.put("entries", { key: `${ev.id}/${id}`, id, eventId: ev.id, name: name.value.trim(), course: course.value,
+      await saveEn({ key: `${ev.id}/${id}`, id, eventId: ev.id, name: name.value.trim(), course: course.value,
         members: t === "solo" && memberIdFor(name.value) ? [memberIdFor(name.value)] : [],
         type: t, size: t === "solo" ? 1 : t === "pair" ? 2 : Math.max(3, Math.round(+size.value) || 3),
         start, finish, retired: !!en?.retired && !finish, punches: [...picked].map(n => ({ n, code: null, t: null })), source: "paper", addedAt: Date.now() });
@@ -1277,7 +1303,7 @@ function nameForm(ev, en) {
   const save = async () => {
     if (!name.value.trim()) { toast("Add a name", "badt"); return; }
     const t = type.value;
-    try { await IDB.put("entries", { ...en, name: name.value.trim(), members: t === "solo" ? (memberIdFor(name.value) ? [memberIdFor(name.value)] : []) : (en.members || []), type: t, size: t === "solo" ? 1 : t === "pair" ? 2 : Math.max(3, Math.round(+size.value) || 3), renamed: true }); }
+    try { await saveEn({ ...en, name: name.value.trim(), members: t === "solo" ? (memberIdFor(name.value) ? [memberIdFor(name.value)] : []) : (en.members || []), type: t, size: t === "solo" ? 1 : t === "pair" ? 2 : Math.max(3, Math.round(+size.value) || 3), renamed: true }); }
     catch (e) { failed(); return; }
     f.hidden = true; await loadEntries(ev.id);
     toast(ev.publishedAt ? "Saved. Tap Publish again to update the results page." : "Saved", "good"); render(true);
@@ -1305,13 +1331,13 @@ function exportCsv(ev) {
 async function deleteEntry(ev, en) {
   if (!confirm(`Delete ${en.name}’s entry?`)) return;
   // phone entries are kept as "deleted" so the sheet doesn't bring them back
-  if (en.source === "phone") await IDB.put("entries", { key: en.key, id: en.id, eventId: ev.id, deleted: true });
-  else await IDB.del("entries", en.key);
+  // kept as "deleted" so the sheet and your other devices don't bring it back
+  await saveEn({ key: en.key, id: en.id, eventId: ev.id, deleted: true });
   S.open = null; await loadEntries(ev.id); render(true);
 }
 async function markBack(ev, en) {
   if (!confirm(`Mark ${en.name} as back safely without a result?`)) return;
-  await IDB.put("entries", { ...en, retired: true }); await loadEntries(ev.id); toast(`${en.name} marked as back`, "good"); render(true);
+  await saveEn({ ...en, retired: true }); await loadEntries(ev.id); toast(`${en.name} marked as back`, "good"); render(true);
 }
 
 function stillOutPanel(ev) {
@@ -1332,15 +1358,21 @@ function stillOutPanel(ev) {
 }
 
 function renderResults() {
+  const out = renderResultsMain();
+  const ev = evById(S.resultsId);
+  if (ev && SHEET) out.push(feedbackPanel(ev));
+  return out;
+}
+function renderResultsMain() {
   if (!S.events.length) return [el("h1", null, "Results"), el("p", { class: "muted" }, S.eventsLoaded ? "Create an event first." : "Loading…")];
   if (!evById(S.resultsId)) S.resultsId = S.events[0].id;
   const ev = evById(S.resultsId), courses = coursesOf(ev);
   if (S.entriesFor !== ev.id) {
     S.entriesFor = ev.id; S.entriesLoaded = false; S.entries = []; S.course = null;
-    loadEntries(ev.id).then(() => render()); fetchSheet(ev, false);
+    loadEntries(ev.id).then(() => render()); fetchSheet(ev, false); pullEntries(ev.id);
   }
   if (!courses.some(c => c.id === S.course)) S.course = courses[0].id;
-  const out = [el("h1", null, "Results"),
+  const out = [el("h1", null, "Results"), syncNote(),
     el("label", { class: "f" }, el("span", null, "Event"), el("select", { onchange: e => { S.resultsId = e.target.value; S.open = null; render(true); } },
       S.events.map(e => el("option", { value: e.id, selected: e.id === ev.id }, `${e.name}, ${fmtDate(e.date)}`)))),
     el("div", { class: "row" },
@@ -1543,10 +1575,11 @@ function renderLive() {
   const out = [el("div", { class: "row" }, el("h1", null, "Club results"),
     el("button", { class: "btn quiet", style: "flex:0 0 auto", disabled: L.loading, onclick: () => fetchLive(true) }, L.loading ? "Loading…" : "Refresh")),
     el("div", { class: "seg", role: "group", "aria-label": "Show", style: "margin:12px 0" },
-      [["event", "Events"], ["league", "League"], ["volunteers", "Volunteers"]].map(([k, v]) =>
+      [["event", "Events"], ["league", "League"], ["volunteers", "Volunteers"], ["me", "My results"]].map(([k, v]) =>
         el("button", { type: "button", "aria-pressed": String(L.tab === k), onclick: () => { L.tab = k; render(true); } }, v)))];
   if (L.err) out.push(el("p", { class: "small bad" }, L.err));
   if (!L.events.length) { out.push(el("p", { class: "muted" }, L.loading || !L.at ? "Loading results…" : "No results published yet. They appear here after each event.")); return out; }
+  if (L.tab === "me") { out.push(...renderMine(L)); return out; }
   const typeChips = chipRow("Running as", [["", "Everyone"], ...Object.entries(TYPES)], L.type, k => L.type = k);
 
   if (L.tab === "event") {
@@ -1557,6 +1590,8 @@ function renderLive() {
     const rows = (e.rows || []).filter(r => r.course === L.course && (!L.type || (r.type || "solo") === L.type)).sort((a, b) => a.pos - b.pos);
     out.push(el("label", { class: "f" }, el("span", null, "Event"), el("select", { id: "liveEvent", onchange: ev => { L.ev = ev.target.value; render(true); } },
       L.events.map(x => el("option", { value: x.id, selected: x.id === e.id }, `${x.name}, ${fmtDate(x.date)}`)))),
+      e.rating && e.rating.count ? el("div", { class: "fbsum" }, el("span", { class: "muted" }, "Route rating"), compassRow(e.rating.avg, null, 22),
+        el("b", null, e.rating.avg.toFixed(1)), el("span", { class: "muted small" }, `from ${e.rating.count} rating${e.rating.count === 1 ? "" : "s"}`)) : null,
       chipRow("Course", courses.map(x => [x.id, x.name]), L.course, k => L.course = k), typeChips,
       c ? el("p", { class: "small muted" }, `${c.name}: ${c.limitMin} minute limit, ${e.penaltyPerMin || 0} points off per minute late` + (+e.bonus ? `, ${e.bonus} bonus points for finishing in time.` : ".")) : null);
     const season = c ? seasonSoFar(L.events, e, c.name) : new Map();
@@ -1627,6 +1662,291 @@ function renderLive() {
   return out;
 }
 
+/* ---------- compass ratings ---------- */
+const RATEKEY = "foc-ratings";
+function compass(on, size = 30) {
+  return el("span", { class: "cmp" + (on ? " on" : ""), "aria-hidden": "true", html:
+    `<svg viewBox="0 0 32 32" width="${size}" height="${size}"><circle class="r" cx="16" cy="16" r="13.5" fill="none" stroke-width="2.5"/>
+     <path class="a" d="M24 8 L17.6 17.6 L14.4 14.4 Z" stroke-width="1.4" stroke-linejoin="round"/>
+     <path class="b" d="M8 24 L14.4 14.4 L17.6 17.6 Z" stroke-width="1.4" stroke-linejoin="round"/></svg>` });
+}
+// A row of 5 compasses. With onPick it's a picker; without, a read-only display (halves round to the nearest).
+function compassRow(value, onPick, size) {
+  const n = Math.round(value || 0);
+  if (!onPick) return el("span", { class: "cmps", role: "img", "aria-label": `${value} out of 5 compasses` }, [1, 2, 3, 4, 5].map(i => compass(i <= n, size)));
+  return el("div", { class: "cmps pick", role: "radiogroup", "aria-label": "Rate this route" }, [1, 2, 3, 4, 5].map(i =>
+    el("button", { type: "button", role: "radio", "aria-checked": String(i === n), "aria-label": `${i} compass${i > 1 ? "es" : ""}`, onclick: () => onPick(i) }, compass(i <= n, size))));
+}
+const RATE_WORDS = ["", "Not for me", "OK", "Good", "Really good", "Brilliant"];
+async function sendRatings() {
+  const q = ls.get(RATEKEY, []) || []; if (!SHEET || !q.length) return;
+  for (const r of q) {
+    try {
+      const j = await (await fetch(SHEET, { method: "POST", body: JSON.stringify({ action: "rate", ...r }) })).json();
+      if (j.ok || j.error === "missing fields") {
+        ls.set(RATEKEY, (ls.get(RATEKEY, []) || []).filter(x => x.runId !== r.runId));
+        if (run && run.runId === r.runId) { run.ratingSent = true; saveRun(run); render(); }
+      }
+    } catch (e) { /* no signal: try again later */ }
+  }
+}
+setInterval(sendRatings, 30000);
+window.addEventListener("online", sendRatings);
+function rateBlock() {
+  if (!SHEET || !run || !run.finish) return null;
+  if (run.ratingDone) return el("div", { class: "rate done" }, compassRow(run.stars, null, 26),
+    el("p", null, run.ratingSent ? "Thanks for rating the route." : "Thanks. Your rating will send when you have signal."));
+  const stars = run.draftStars || 0;
+  const note = el("textarea", { id: "rateNote", rows: 3, maxlength: 500, placeholder: "Anything you enjoyed, or that could be better? (optional)",
+    oninput: e => { run.draftNote = e.target.value; saveRun(run); } });
+  note.value = run.draftNote || "";
+  return el("div", { class: "rate" }, el("h2", null, "Rate this route"),
+    compassRow(stars, i => { run.draftStars = i; saveRun(run); render(true); }, 38),
+    el("p", { class: "small muted", style: "min-height:1.2em" }, stars ? RATE_WORDS[stars] : "Tap a compass: 1 is poor, 5 is brilliant."),
+    note,
+    el("button", { class: "btn go", style: "margin-top:8px", disabled: !stars, onclick: () => {
+      run.stars = stars; run.ratingDone = true; saveRun(run);
+      ls.set(RATEKEY, (ls.get(RATEKEY, []) || []).filter(x => x.runId !== run.runId).concat([{ runId: run.runId, eventId: run.eventId, course: run.course,
+        name: run.name, stars, comment: (run.draftNote || "").trim().slice(0, 500) }]));
+      render(true); sendRatings();
+    } }, "Send rating"));
+}
+
+/* organiser: read the ratings for an event */
+async function fetchFeedback(ev, loud) {
+  const key = String(ls.get(KEYKEY, "") || "").trim(); if (!SHEET || !key) return;
+  S.fb = S.fb || {}; S.fbLoading = true; if (loud) render();
+  try {
+    const j = await (await fetch(SHEET, { method: "POST", body: JSON.stringify({ action: "feedback", key, eventId: ev.id }) })).json();
+    if (j.ok) S.fb[ev.id] = j.feedback || [];
+  } catch (e) { if (loud) toast("Couldn’t load ratings. Check your signal.", "badt"); }
+  S.fbLoading = false; render();
+}
+function feedbackPanel(ev) {
+  if (!SHEET) return null;
+  const list = (S.fb || {})[ev.id];
+  if (list === undefined && !S.fbLoading) fetchFeedback(ev);
+  const avg = list && list.length ? Math.round(list.reduce((a, f) => a + f.stars, 0) / list.length * 10) / 10 : 0;
+  const counts = [5, 4, 3, 2, 1].map(n => [n, (list || []).filter(f => f.stars === n).length]);
+  const cname = id => (coursesOf(ev).find(c => c.id === id) || {}).name || "";
+  const open = !!S.fbOpen;
+  return el("div", { class: "sec" }, el("div", { class: "row" }, el("h2", null, "Route ratings"),
+      el("button", { class: "btn quiet", style: "flex:0 0 auto", onclick: () => fetchFeedback(ev, true) }, S.fbLoading ? "Loading…" : "Refresh")),
+    list === undefined ? el("p", { class: "muted" }, "Loading ratings…")
+    : !list.length ? el("p", { class: "muted" }, "No ratings yet. Runners can rate the route on their finish screen.")
+    : el("div", null,
+        el("div", { class: "fbsum" }, el("span", { class: "big" }, avg.toFixed(1)), compassRow(avg, null, 24), el("span", { class: "muted" }, `from ${list.length} rating${list.length === 1 ? "" : "s"}`)),
+        el("div", { class: "dist" }, counts.map(([n, c]) => el("div", null, el("span", null, n), el("span", { class: "barw" }, el("span", { class: "bar", style: `width:${list.length ? c / list.length * 100 : 0}%` })), el("span", null, c)))),
+        el("p", { class: "small muted" }, "Comments are only visible to you. The public results show the average."),
+        el("ul", { class: "fbl" }, list.filter(f => f.comment).map(f => el("li", null,
+          el("div", { class: "fbh" }, compassRow(f.stars, null, 16), el("b", null, f.name || "Anonymous"), el("span", { class: "small muted" }, cname(f.course))),
+          el("p", null, f.comment)))),
+        list.some(f => f.comment) ? null : el("p", { class: "muted" }, "No comments yet, just ratings.")),
+    el("details", { class: "mem", open, ontoggle: e => { S.fbOpen = e.target.open; } }, el("summary", null, "Add a rating for a paper runner"), paperRating(ev)));
+}
+function paperRating(ev) {
+  let stars = 0;
+  const name = el("input", { type: "text", id: "prName", maxlength: 60, list: "memberNames", placeholder: "Name (optional)" });
+  const course = el("select", { id: "prCourse" }, coursesOf(ev).map(c => el("option", { value: c.id }, c.name)));
+  const note = el("textarea", { id: "prNote", rows: 2, maxlength: 500, placeholder: "Comment (optional)" });
+  const pick = el("div");
+  const draw = () => pick.replaceChildren(compassRow(stars, i => { stars = i; draw(); }, 30));
+  draw();
+  return el("div", null, pick, el("div", { class: "grid2" }, name, course), note,
+    el("button", { class: "btn quiet", style: "margin-top:8px", onclick: async () => {
+      if (!stars) { toast("Tap a compass rating first", "badt"); return; }
+      try {
+        const j = await (await fetch(SHEET, { method: "POST", body: JSON.stringify({ action: "rate", runId: "p" + Date.now(), eventId: ev.id, course: course.value,
+          name: name.value.trim(), stars, comment: note.value.trim() }) })).json();
+        if (!j.ok) throw new Error();
+        toast("Rating added", "good"); S.fbOpen = false; fetchFeedback(ev, true);
+      } catch (e) { toast("Couldn’t save the rating. Check your signal.", "badt"); }
+    } }, "Add rating"));
+}
+
+/* ---------- My results ---------- */
+const MYKEY = "foc-me";
+function myId() {
+  const saved = ls.get(MYKEY, null); if (saved && memberName(saved)) return saved;
+  const t = (ls.get(TEAMKEY, []) || [])[0]; return t && memberName(t) ? t : null;
+}
+const hasMember = (r, id) => (r.members || []).includes(id);
+function renderMine(L) {
+  if (!S.members.length) return [el("p", { class: "muted" }, "My results needs the club member list. Ask the organiser to add it.")];
+  const id = L.meId || myId();
+  const sorted = [...S.members].sort((a, b) => a.name.localeCompare(b.name));
+  const pick = el("label", { class: "f" }, el("span", null, "Whose results?"),
+    el("select", { id: "meSel", onchange: e => { L.meId = e.target.value; if (e.target.value) ls.set(MYKEY, e.target.value); render(true); } },
+      el("option", { value: "" }, "Choose your name…"), sorted.map(m => el("option", { value: m.id, selected: m.id === id }, m.name))));
+  if (!id) return [pick, el("p", { class: "muted" }, "Pick your name and this phone will remember it.")];
+
+  // every published result with this member in it, newest first
+  const runs = [];
+  for (const e of L.events) for (const c of e.courses || []) {
+    const rows = (e.rows || []).filter(r => r.course === c.id);
+    for (const r of rows) if (hasMember(r, id)) {
+      const place = rows.findIndex(o => +o.total === +r.total && +o.time === +r.time) + 1;
+      runs.push({ e, c, r, place, of: rows.length });
+    }
+  }
+  runs.sort((a, b) => (b.e.date || "").localeCompare(a.e.date || ""));
+  const medals = [1, 2, 3].map(p => runs.filter(x => x.place === p).length);
+  const evCount = new Set(runs.map(x => x.e.id)).size;
+  const helped = L.events.filter(e => (e.volunteers || []).some(v => v.id === id)).length;
+  const year = String(new Date().getFullYear());
+  const thisYear = L.events.filter(e => (e.date || "").startsWith(year));
+  const standings = [];
+  for (const cn of [...new Set(thisYear.flatMap(e => (e.courses || []).map(c => c.name)))]) {
+    const table = seasonLeague(thisYear, cn, "");
+    table.forEach(t => {
+      const ids = t.key.startsWith("m:") ? t.key.slice(2).split("|")[0].split("+") : [];
+      if (ids.includes(id)) standings.push({ course: cn, type: t.type, size: t.size, points: t.points, events: t.events,
+        place: table.findIndex(o => o.points === t.points) + 1, of: table.length });
+    });
+  }
+  const stat = (n, label) => el("div", { class: "stat" }, el("b", null, n), el("span", null, label));
+  return [pick,
+    el("div", { class: "stats" }, stat(evCount, evCount === 1 ? "event" : "events"), stat(runs.reduce((a, x) => a + +x.r.total, 0), "points"),
+      stat(medals[0] + medals[1] + medals[2], "medals"), stat(helped, "helped at")),
+    medals.some(Boolean) ? el("div", { class: "medrow" }, [1, 2, 3].filter(p => medals[p - 1]).map(p => el("span", null, medal(p), `× ${medals[p - 1]}`))) : null,
+    el("h2", { style: "margin-top:20px" }, `${year} season`),
+    standings.length ? el("ul", { class: "board" }, standings.map(s => el("li", null,
+        el("span", { class: "pos" }, medal(s.place)),
+        el("span", { class: "who" }, el("span", { class: "name" }, s.course), s.type !== "solo" ? [" ", el("span", { class: "tag p" }, typeLabel(s.type, s.size))] : null,
+          el("span", { class: "small muted" }, `${ordinal(s.place)} of ${s.of}, ${s.events} event${s.events === 1 ? "" : "s"}`)),
+        el("span", { class: "tot" }, s.points, el("span", { class: "season" }, "league pts")))))
+      : el("p", { class: "muted" }, `No league points in ${year} yet.`),
+    el("h2", { style: "margin-top:20px" }, "Every event"),
+    runs.length ? el("ul", { class: "board" }, runs.map(x => el("li", null,
+        el("span", { class: "pos" }, medal(x.place)),
+        el("span", { class: "who" }, el("span", { class: "name" }, x.e.name), (x.r.type || "solo") !== "solo" ? [" ", el("span", { class: "tag p" }, typeLabel(x.r.type, x.r.size))] : null,
+          el("span", { class: "small muted" }, `${fmtDate(x.e.date)} · ${x.c.name} · ${fmtDur(x.r.time)}, ${x.r.controls} control${x.r.controls === 1 ? "" : "s"}`),
+          el("span", { class: "small muted" }, `${ordinal(x.place)} of ${x.of}`)),
+        el("span", { class: "tot" }, x.r.total, el("span", { class: "season" }, "pts")))))
+      : el("p", { class: "muted" }, "No published results yet. They appear here after each event.")];
+}
+
+/* ---------- organiser sync between devices ----------
+   Events, controls, maps and organiser edits to results go to the Google Sheet (maps to Drive).
+   Each device keeps its own copy so it works offline; for each item the newest edit wins. */
+const SYNCKEY = "foc-sync", MAPVERKEY = "foc-mapver";
+const syncQ = () => Object.assign({ ev: [], en: [], del: [], map: [] }, ls.get(SYNCKEY, {}) || {});
+const setQ = q => ls.set(SYNCKEY, q);
+const canSync = () => !!(SHEET && S.editor && String(ls.get(KEYKEY, "") || "").trim());
+function queue(kind, id) { const q = syncQ(); if (!q[kind].includes(id)) q[kind].push(id); setQ(q); setTimeout(flushSync, 300); }
+async function saveEv(ev) { ev.updatedAt = Date.now(); await IDB.put("events", ev); queue("ev", ev.id); }
+async function saveEn(en) { en.updatedAt = Date.now(); await IDB.put("entries", en); queue("en", en.key); }
+function queueDelEvent(id) { const q = syncQ(); q.ev = q.ev.filter(x => x !== id); q.map = q.map.filter(x => x !== id);
+  q.del = q.del.filter(x => x.id !== id).concat([{ id, at: Date.now() }]); setQ(q); setTimeout(flushSync, 300); }
+const post = async body => (await fetch(SHEET, { method: "POST", body: JSON.stringify({ key: String(ls.get(KEYKEY, "") || "").trim(), ...body }) })).json();
+
+let flushing = false;
+S.sync = { state: "", at: 0 };
+async function flushSync() {
+  if (!canSync() || flushing) return;
+  const q = syncQ(); if (!q.ev.length && !q.en.length && !q.del.length && !q.map.length) { S.sync.state = "ok"; return; }
+  flushing = true; S.sync.state = "sending";
+  try {
+    // maps first, so the event that points at the map file goes up afterwards
+    for (const id of q.map) {
+      const blob = await IDB.get("maps", id), ev = await IDB.get("events", id);
+      if (blob && ev) {
+        const url = await blobToDataUrl(blob);
+        const j = await post({ action: "putMap", eventId: id, mime: blob.type, data: url.slice(url.indexOf(",") + 1), previous: ev.mapFile || "" });
+        if (!j.ok) throw new Error(j.error);
+        ev.mapFile = j.fileId; const mv = ls.get(MAPVERKEY, {}) || {}; mv[id] = j.fileId; ls.set(MAPVERKEY, mv);
+        ev.updatedAt = Date.now(); await IDB.put("events", ev); const qq = syncQ(); if (!qq.ev.includes(id)) qq.ev.push(id); setQ(qq);
+      }
+      const qq = syncQ(); qq.map = qq.map.filter(x => x !== id); setQ(qq);
+    }
+    const q2 = syncQ();
+    const events = (await Promise.all(q2.ev.map(id => IDB.get("events", id)))).filter(Boolean);
+    const entries = (await Promise.all(q2.en.map(k => IDB.get("entries", k)))).filter(Boolean);
+    const sent = new Map([...events, ...entries].map(x => [x.key || x.id, x.updatedAt]));
+    const j = await post({ action: "sync", events, entries, deleted: q2.del });
+    if (!j.ok) throw new Error(j.error);
+    // take off the queue only what hasn't changed again while sending
+    const q3 = syncQ(), still = async (store, k) => { const x = await IDB.get(store, k); return x && x.updatedAt !== sent.get(k); };
+    const ev3 = []; for (const id of q3.ev) if (!sent.has(id) ? !q2.ev.includes(id) : await still("events", id)) ev3.push(id);
+    const en3 = []; for (const k of q3.en) if (!sent.has(k) ? !q2.en.includes(k) : await still("entries", k)) en3.push(k);
+    setQ({ ...q3, ev: ev3, en: en3, del: q3.del.filter(x => !q2.del.some(y => y.id === x.id && y.at === x.at)) });
+    S.sync = { state: "ok", at: Date.now() };
+  } catch (e) {
+    S.sync.state = e && e.message === "wrong password" ? "password" : "offline";
+  } finally { flushing = false; render(); }
+  const q4 = syncQ(); if (S.sync.state === "ok" && (q4.ev.length || q4.en.length || q4.del.length || q4.map.length)) setTimeout(flushSync, 500);
+}
+
+let pulling = false;
+async function pullEvents(force) {
+  if (!canSync() || pulling || (!force && Date.now() - (S.sync.pulled || 0) < 30000)) return;
+  pulling = true; S.sync.pulled = Date.now();
+  try {
+    const j = await post({ action: "pullEvents" });
+    if (!j.ok) { if (j.error === "wrong password") S.sync.state = "password"; return; }
+    const q = syncQ(), remote = new Map((j.events || []).map(e => [e.id, e])), mv = ls.get(MAPVERKEY, {}) || {};
+    let changed = false;
+    for (const r of remote.values()) {
+      if (q.ev.includes(r.id) || q.del.some(x => x.id === r.id)) continue;
+      const local = await IDB.get("events", r.id);
+      if (r.deleted) {
+        if (local && (local.updatedAt || 0) <= r.updatedAt) {
+          for (const en of (await IDB.all("entries")).filter(x => x.eventId === r.id)) await IDB.del("entries", en.key);
+          await IDB.del("maps", r.id); await IDB.del("events", r.id); changed = true;
+          if (S.editing === r.id) S.editing = null;
+        }
+        continue;
+      }
+      if (!local || (r.updatedAt || 0) > (local.updatedAt || 0)) { await IDB.put("events", r); changed = true; }
+      if (r.mapFile && mv[r.id] !== r.mapFile && !q.map.includes(r.id)) {
+        const m = await post({ action: "getMap", fileId: r.mapFile });
+        if (m.ok) {
+          const bytes = Uint8Array.from(atob(m.data), c => c.charCodeAt(0));
+          await IDB.put("maps", new Blob([bytes], { type: m.mime || "image/png" }), r.id);
+          mv[r.id] = r.mapFile; ls.set(MAPVERKEY, mv);
+          if (S.mapUrls[r.id]) { URL.revokeObjectURL(S.mapUrls[r.id]); delete S.mapUrls[r.id]; }
+          changed = true;
+        }
+      }
+    }
+    // events made on this device before syncing existed: send them up once
+    for (const ev of await IDB.all("events")) if (!remote.has(ev.id) && !q.ev.includes(ev.id)) {
+      if (!ev.updatedAt) { ev.updatedAt = Date.now(); await IDB.put("events", ev); }
+      queue("ev", ev.id); if (ev.hasMap && !ev.mapFile) queue("map", ev.id);
+      for (const en of (await IDB.all("entries")).filter(x => x.eventId === ev.id)) { if (!en.updatedAt) { en.updatedAt = Date.now(); await IDB.put("entries", en); } queue("en", en.key); }
+    }
+    S.sync.state = S.sync.state === "password" ? "password" : (S.sync.state || "ok"); S.sync.at = Date.now();
+    if (changed) { await loadEvents(); render(); }
+  } catch (e) { S.sync.state = "offline"; }
+  finally { pulling = false; }
+}
+async function pullEntries(evId) {
+  if (!canSync()) return;
+  try {
+    const j = await post({ action: "pullEntries", eventId: evId }); if (!j.ok) return;
+    const q = syncQ(); let changed = false;
+    for (const r of j.entries || []) {
+      if (!r.key || q.en.includes(r.key)) continue;
+      const local = await IDB.get("entries", r.key);
+      if (!local || (r.updatedAt || 0) > (local.updatedAt || 0)) { await IDB.put("entries", r); changed = true; }
+    }
+    if (changed && S.entriesFor === evId) { await loadEntries(evId); render(); }
+  } catch (e) {}
+}
+setInterval(() => { if (document.visibilityState !== "visible" || !S.editor) return;
+  flushSync(); pullEvents(); if (view === "results" && S.resultsId) pullEntries(S.resultsId); }, 30000);
+window.addEventListener("online", () => { flushSync(); pullEvents(true); });
+function syncNote() {
+  if (!SHEET) return null;
+  const q = syncQ(), waiting = q.ev.length + q.en.length + q.del.length + q.map.length;
+  const st = S.sync.state;
+  const msg = st === "password" ? "Not syncing: the saved password doesn’t match your Google Sheet. Lock and sign in again."
+    : waiting ? (st === "offline" ? `${waiting} change${waiting === 1 ? "" : "s"} waiting to sync. They’ll send when you have signal.` : "Syncing…")
+    : S.sync.at ? `Synced with your other devices at ${fmtClock(S.sync.at).slice(0, 5)}.` : "Checking for changes from your other devices…";
+  return el("p", { class: "small " + (st === "password" ? "bad" : "muted"), style: "margin:4px 0 0" }, msg, " ",
+    el("button", { class: "link small", style: "padding:0", onclick: () => { flushSync(); pullEvents(true); if (S.resultsId) pullEntries(S.resultsId); } }, "Sync now"));
+}
+
 /* ---------- organiser sign-in ---------- */
 function renderUnlock() {
   const pw = el("input", { type: "password", id: "orgPass", autocomplete: "current-password" });
@@ -1641,7 +1961,7 @@ function renderUnlock() {
         ls.set("foc-org", true); ls.set(KEYKEY, key);
         try { navigator.storage?.persist?.(); } catch (x) {}
         route(); try { await loadEvents(); } catch (x) {}
-        render(true); toast("Organiser mode is on for this phone", "good"); return;
+        render(true); toast("Organiser mode is on. Fetching your events…", "good"); pullEvents(true); return;
       }
       toast(j.error === "no password set" ? "Set PUBLISH_PASSWORD in your Google Sheet script first" : "That password isn’t right", "badt");
     } catch (x) { toast("Couldn’t reach the sheet. You need signal to unlock organiser mode the first time.", "badt"); }
@@ -1682,13 +2002,13 @@ app.addEventListener("focusout", () => setTimeout(() => {
   const a = document.activeElement;
   if (S.pending && !(a && app.contains(a) && a.matches("input:not([type=file]),select,textarea"))) render();
 }, 0));
-window.addEventListener("hashchange", () => { route(); render(true); scrollTo(0, 0); });
+window.addEventListener("hashchange", () => { route(); render(true); scrollTo(0, 0); if (S.editor) { pullEvents(); flushSync(); } });
 
 (async function init() {
   route(); render(true);
-  if (S.editor) { try { await loadEvents(); } catch (e) { toast("This browser blocked on-device storage", "badt"); } render(true); }
+  if (S.editor) { try { await loadEvents(); } catch (e) { toast("This browser blocked on-device storage", "badt"); } render(true); flushSync(); pullEvents(true); }
   window.addEventListener("hashchange", async () => { if (S.editor && !S.eventsLoaded) { await loadEvents(); render(true); } });
-  sendOutbox(); sendJoin(); fetchMembers(true);
+  sendOutbox(); sendJoin(); sendRatings(); fetchMembers(true);
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("./sw.js").catch(() => {});
 })();
 </script>
